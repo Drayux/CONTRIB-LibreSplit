@@ -38,7 +38,7 @@ static long long ls_time_now(void)
  * @param load_removed Whether to subtract load_removed from RTA time
  * @return The current time
  */
-inline long long ls_timer_get_time(const ls_timer* timer, bool load_removed)
+inline long long _ls_timer_get_time(const ls_timer* timer, bool load_removed)
 {
     if (timer->usingGameTime) {
         return timer->gameTime;
@@ -49,6 +49,44 @@ inline long long ls_timer_get_time(const ls_timer* timer, bool load_removed)
     }
 
     return timer->realTime;
+}
+
+/**
+ * Gets the timer current actual time -- total duration elapsed from run start.
+ *
+ * @param timer Reference to the timer instance
+ * @return The current real elapsed time
+ */
+long long ls_timer_get_real_time(ls_timer const * timer)
+{
+	return timer->realTime;
+}
+
+/**
+ * Gets the timer load-removed time -- aggregate time game has not been loading.
+ *
+ * @param timer Reference to the timer instance
+ * @return The computed load-removed real time
+ */
+long long ls_timer_get_load_removed_time(ls_timer const * timer)
+{
+	return timer->realTime - timer->loadingTime;
+}
+
+/**
+ * Gets the derived game time -- literal value retrieved from lua autosplitter.
+ * Fallback to -1 second if not defined.
+ *
+ * @param timer Reference to the timer instance
+ * @return The memory value game time, if available
+ */
+long long ls_timer_get_game_time(ls_timer const * timer)
+{
+	if (timer->usingGameTime)
+		return timer->gameTime;
+
+	// Fallback if game time is not applicable
+	return (long long) -1000;
 }
 
 /**
@@ -263,6 +301,11 @@ void ls_game_release(ls_game* game)
         free(game->best_segments);
         game->best_segments = 0;
     }
+	// TODO: Temporary value -- don't forget to remove me once moved!
+    if (game->bt_timer_source) {
+        free(game->bt_timer_source);
+        game->bt_timer_source = 0;
+    }
 
     free(game);
 }
@@ -354,6 +397,12 @@ int ls_game_create(ls_game** game_ptr, const char* path, char** error_msg)
     if (ref) {
         game->world_record = ls_time_value(
             json_string_value(ref));
+    }
+	// get the basic timer display source
+    ref = json_object_get(json, "bt_timer_source"); // TODO (again) :
+		// this is very temporary here! Just taking baby steps for proof of concept
+    if (ref) {
+        game->bt_timer_source = strdup(json_string_value(ref));
     }
     // get splits
     ref = json_object_get(json, "splits");
@@ -624,12 +673,12 @@ int ls_game_save(const ls_game* game)
 
 int ls_run_save(ls_timer* timer, const char* reason)
 {
-    if (ls_timer_get_time(timer, true) == 0)
+    if (_ls_timer_get_time(timer, true) == 0)
         return 0;
 
     int error = 0;
     char final_time_str[128];
-    ls_time_string_serialized(final_time_str, ls_timer_get_time(timer, true));
+    ls_time_string_serialized(final_time_str, _ls_timer_get_time(timer, true));
 
     // Root JSON Object
     json_t* json = json_object();
@@ -951,7 +1000,7 @@ int ls_timer_start(ls_timer* timer)
  */
 int ls_timer_split(ls_timer* timer)
 {
-    if (ls_timer_get_time(timer, true) <= 0) {
+    if (_ls_timer_get_time(timer, true) <= 0) {
         return 0;
     }
 
@@ -1010,7 +1059,7 @@ int ls_timer_split(ls_timer* timer)
  */
 int ls_timer_skip(ls_timer* timer)
 {
-    if (ls_timer_get_time(timer, false) <= 0)
+    if (_ls_timer_get_time(timer, false) <= 0)
         return 0;
 
     if (timer->curr_split + 1 == timer->game->split_count) {
@@ -1102,7 +1151,7 @@ int ls_timer_reset(ls_timer* timer)
     if (timer->running)
         return 0;
 
-    if (timer->started && ls_timer_get_time(timer, true) <= 0) {
+    if (timer->started && _ls_timer_get_time(timer, true) <= 0) {
         return ls_timer_cancel(timer);
     }
 

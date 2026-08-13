@@ -30,6 +30,25 @@ typedef struct ls_game {
     long long* segment_times;
     long long* best_splits;
     long long* best_segments;
+
+	/* TODO: Move me! Dummy value for experimenting with the timer source config
+	 * I would like to propose a revised segregation of data / state / UI with
+	 * respect to my subsequent plans to allow the user to specify the component
+	 * layout in the splits file.
+	 *
+	 * I like the split history a lot, so it might be best if the "split config
+	 * file" just specified the schema, and then split history would track the
+	 * actual times. Possible concern is if someone modifies the split names
+	 * later on. Perhaps loading old splits should stomp the schema? Maybe the
+	 * split file saves the best times for redundancy?
+	 *
+	 * Also worth consideration is having the "best splits" reference a
+	 * timestamp of the best run, rather than duplicating data, but this makes
+	 * loading IL data difficult.
+	 *
+	 * A lot of things to think about here, wasn't sure where else to jot them
+	 * down. */
+	char* bt_timer_source;
 } ls_game;
 
 /**
@@ -62,7 +81,13 @@ typedef struct ls_timer {
 
 extern atomic_bool run_started;
 
-long long ls_timer_get_time(const ls_timer* timer, bool load_removed);
+long long _ls_timer_get_time(const ls_timer* timer, bool load_removed);
+
+long long ls_timer_get_real_time(ls_timer const * timer);
+
+long long ls_timer_get_load_removed_time(ls_timer const * timer);
+
+long long ls_timer_get_game_time(ls_timer const * timer);
 
 long long ls_time_value(const char* string);
 

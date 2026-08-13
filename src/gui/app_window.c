@@ -393,10 +393,13 @@ static void ls_app_window_init(LSAppWindow* win)
     gtk_widget_set_vexpand(win->box, TRUE);
     gtk_container_add(GTK_CONTAINER(win->container), win->box);
 
-    // Create all available components (TODO: change this in the future)
+    // Create all available components
+	/* TODO: Plan will be to tweak this to take in JSON configuration
+	 * presumably retrieved from the splits file. Then we can run
+	 * through a list of [ component class, requested config ]*/
     win->components = NULL;
     for (i = 0; ls_components[i].name != NULL; i++) {
-        LSComponent* component = ls_components[i].new();
+        LSComponent* component = ls_components[i].new(NULL);
         if (component) {
             GtkWidget* widget = component->ops->widget(component);
             if (widget) {

@@ -20,8 +20,10 @@ extern LSComponentOps ls_wr_operations;
 /**
  * Constructor
  */
-LSComponent* ls_component_wr_new(void)
+LSComponent* ls_component_wr_new(json_t* user_config)
 {
+	(void) user_config;
+
     LSWr* self;
 
     self = malloc(sizeof(LSWr));

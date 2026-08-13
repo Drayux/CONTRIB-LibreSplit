@@ -80,8 +80,8 @@ libresplit_sources = files(
     'src/gui/settings_dialog.c',
 
     # Components
+    'src/gui/component/basic-timer.c',
     'src/gui/component/best-sum.c',
-    'src/gui/component/clock.c',
     'src/gui/component/components.c',
     'src/gui/component/pb.c',
     'src/gui/component/prev-segment.c',

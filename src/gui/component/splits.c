@@ -50,8 +50,10 @@ void free_all(LSSplits* self_)
 /**
  * Constructor
  */
-LSComponent* ls_component_splits_new(void)
+LSComponent* ls_component_splits_new(json_t* user_config)
 {
+	(void) user_config;
+
     LSSplits* self;
 
     self = malloc(sizeof(LSSplits));

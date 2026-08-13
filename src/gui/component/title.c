@@ -21,8 +21,10 @@ extern LSComponentOps ls_title_operations; // defined at the end of the file
 /**
  * Constructor
  */
-LSComponent* ls_component_title_new(void)
+LSComponent* ls_component_title_new(json_t* user_config)
 {
+	(void) user_config;
+
     LSTitle* self;
 
     self = malloc(sizeof(LSTitle));

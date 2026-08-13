@@ -3,6 +3,7 @@
 
 #include <ctype.h>
 #include <gtk/gtk.h>
+#include <jansson.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -33,9 +34,17 @@ typedef struct LSComponentOps {
     void (*cancel_run)(LSComponent* self, ls_timer* timer);
 } LSComponentOps;
 
+/* TODO: I added this json_t* user_config, but the timer-related
+ * changes might be better suited for the show_game / clear_game
+ * callbacks. The "config" might be the same way, as this would
+ * be derived from a splits file (for now.)
+ *
+ * Alas, I need to check if there's a scenario that demands that
+ * we regenerate the component entirely. If so, then here is the
+ * correct location. */
 typedef struct LSComponentAvailable {
     char* name;
-    LSComponent* (*new)(void);
+    LSComponent* (*new)(json_t* user_config);
 } LSComponentAvailable;
 
 // A NULL-terminated array of all available components
