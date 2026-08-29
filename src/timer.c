@@ -383,6 +383,8 @@ static void ls_auto_splitter_settings_release(ls_game* game)
  */
 void ls_game_release(ls_game* game)
 {
+	json_t ** component_config;
+
     if (game == NULL) {
         return;
     }
@@ -409,6 +411,16 @@ void ls_game_release(ls_game* game)
     free(game->auto_splitter_file);
     game->auto_splitter_file = 0;
     ls_auto_splitter_settings_release(game);
+
+	if (game->component_config) {
+		component_config = &game->component_config[0];
+		while (*component_config) {
+			json_decref(*component_config);
+			++component_config;
+		}
+		free(game->component_config);
+		game->component_config = NULL;
+	}
 
     if (game->split_titles) {
         for (unsigned int i = 0; i < game->split_count; ++i) {
@@ -563,14 +575,13 @@ int ls_game_create(ls_game** game_ptr, const char* path, char** error_msg)
     json = json_load_file(game->path, 0, &json_error);
     if (!json) {
         error = 1;
-        size_t msg_len = snprintf(NULL, 0, "%s (%d:%d)", json_error.text, json_error.line, json_error.column);
+        size_t msg_len = snprintf(NULL, 0, "JSON parse error %s (%d:%d)", json_error.text, json_error.line, json_error.column);
         *error_msg = calloc(msg_len + 1, sizeof(char));
         if (*error_msg == NULL) {
             LOG_ERR("Cannot allocate memory for error message");
-            error = 1;
             goto game_create_error;
         }
-        sprintf(*error_msg, "%s (%d:%d)", json_error.text, json_error.line, json_error.column);
+        sprintf(*error_msg, "JSON parse error %s (%d:%d)", json_error.text, json_error.line, json_error.column);
         goto game_create_error;
     }
     // copy game name
@@ -712,18 +723,64 @@ int ls_game_create(ls_game** game_ptr, const char* path, char** error_msg)
     if (ref) {
         json_time_get(ref, &game->world_record);
     }
+	// get component config
+    ref = json_object_get(json, "components");
+    if (ref && !json_is_null(ref)) {
+		/* If defined, must be an array */
+		if (!json_is_array(ref)) {
+			error = 1;
+			*error_msg = strdup("Component config provided but is not an array");
+			if (*error_msg == NULL) {
+				LOG_ERR("Cannot allocate memory for error message");
+			}
+			goto game_create_error;
+		} else if (json_array_size(ref) == 0) {
+			error = 1;
+			*error_msg = strdup("Component config provided but is empty");
+			if (*error_msg == NULL) {
+				LOG_ERR("Cannot allocate memory for error message");
+			}
+			goto game_create_error;
+		} else if (!(game->component_config = calloc(json_array_size(ref) + 1, sizeof(json_t*)))) {
+			error = 1;
+			*error_msg = strdup("Not enough memory for component config array");
+			if (*error_msg == NULL) {
+				LOG_ERR("Cannot allocate memory for error message");
+			}
+			goto game_create_error;
+		}
+
+		/* This is the first of two validation checks for the component config.
+		 * If the asserted conditions are not met, then it is not supported to
+		 * load and subsequently save without losing the original, albeit
+		 * invalid, splits file. Futher errors can be handled gracefully. */
+		int num_components = 0;
+		json_t* component_cfg;
+		for (size_t i = 0; i < json_array_size(ref); ++i) {
+			component_cfg = json_array_get(ref, i);
+
+			// 'Whitelist' validation logic
+			if (json_is_string(component_cfg));
+			else if (json_is_string(json_object_get(component_cfg, "component")));
+			else {
+				error = 1;
+				*error_msg = strdup("Invalid component config given");
+				goto game_create_error;
+			}
+
+			/* Each component validates its own sub-config. */
+			game->component_config[num_components++] = component_cfg;
+			json_incref(component_cfg); // held for lifetime of ls_game
+		}
+	}
     // get splits
     ref = json_object_get(json, "splits");
     if (!json_is_array(ref) || json_array_size(ref) == 0) {
         error = 1;
-        size_t msg_len = snprintf(NULL, 0, "Split file must contain a non-empty splits array");
-        *error_msg = calloc(msg_len + 1, sizeof(char));
+		*error_msg = strdup("Split file must contain a non-empty splits array");
         if (*error_msg == NULL) {
             LOG_ERR("Cannot allocate memory for error message");
-            error = 1;
-            goto game_create_error;
         }
-        sprintf(*error_msg, "Split file must contain a non-empty splits array");
         goto game_create_error;
     }
     if (ref) {
@@ -1126,6 +1183,9 @@ int ls_game_save(const ls_game* game)
     char str[256];
     json_t* json = json_object();
     json_t* splits = json_array();
+	json_t ** component_config;
+    if (game->title) {
+        json_object_set_new(json, "title", json_string(game->title));
     if (game->name) {
         json_object_set_new(json, "name", json_string(game->name));
     }
@@ -1152,6 +1212,21 @@ int ls_game_save(const ls_game* game)
         ls_time_string_serialized(str, game->start_delay);
         json_object_set_new(json, "start_delay", json_string(str));
     }
+	if ((component_config = game->component_config)) {
+		json_t* component_list = json_array();
+		while (*component_config) {
+			/* Increments refcount (presumably to 2) during the save operation
+			 * which is dropped (presumably back to 1) once `json_t* json` is
+			 * dropped. Final ref only cleared when the app window changes.
+			 *
+			 * Holding the reference in game allows us to preserve configs,
+			 * even if they are invalid, so users can tweak a typo, rather than
+			 * rewrite the entire object json. */
+			json_array_append(component_list, *component_config);
+			++component_config;
+		}
+		json_object_set_new(json, "components", component_list);
+	}
     for (unsigned int i = 0; i < game->split_count; ++i) {
         json_t* split = json_object();
         json_object_set_new(split, "title", json_string(game->split_titles[i]));

@@ -129,6 +129,172 @@ LSAppWindow* ls_app_window_get_default(LSApp* app)
     return main_win;
 }
 
+static void ls_app_window_destroy_components(LSAppWindow* win)
+{
+	if (!win || !win->components) {
+		return;
+	}
+
+    LOG_DEBUG("Destroying components...");
+
+	/* Remove all widgets in the widget box */
+	GList* l = gtk_container_get_children(GTK_CONTAINER(win->box));
+	for (; l != NULL; l = l->next) {
+		GtkWidget* w = GTK_WIDGET(l->data);
+		gtk_container_remove(GTK_CONTAINER(win->box), w);
+	}
+
+	/* Call the delete method for all tracked components.
+	 * NOTE: The refcount of the component's corresponding GtkWidget(s) is
+	 * dropped to 0 when the container is removed above. Thus, the delete
+	 * logic need not destroy this itself. */
+	for (l = win->components; l != NULL; l = l->next) {
+        LSComponent* c = l->data;
+		if (c && c->ops->delete) {
+			c->ops->delete(c);
+		} else {
+			LOG_DEBUG("Skipped release of component with no delete method.");
+		}
+    }
+
+	g_list_free(win->components);
+    win->components = NULL;
+}
+
+static void ls_app_window_default_components(LSAppWindow* win)
+{
+    LOG_DEBUG("Creating default components...");
+
+	// TODO: better defaults, just proof of concept right now
+	// ^^ Maybe better to make this static so we don't keep searching for it?
+	LSComponentAvailable const * default_components[] = {
+		get_component("title"),
+		get_component("splits"),
+		get_component("timer"),
+		/* --- */
+		NULL
+	};
+
+	LSComponentAvailable const ** component_init;
+	LSComponent* component;
+	GtkWidget* widget;
+
+	component_init = &default_components[0];
+
+	while (*component_init) {
+        if ((component = (*component_init)->new(NULL))) {
+            widget = component->ops->widget(component);
+            if (widget) {
+                gtk_widget_set_margin_start(widget, WINDOW_PAD);
+                gtk_widget_set_margin_end(widget, WINDOW_PAD);
+                gtk_container_add(GTK_CONTAINER(win->box),
+                    component->ops->widget(component));
+            }
+            win->components = g_list_append(win->components, component);
+        }
+		++component_init;
+	}
+}
+
+static bool ls_app_window_add_components(LSAppWindow* win)
+{
+	json_t ** component_config; /* List of pointers (json objects) */
+	json_t * component_ref;
+	char const * component_name;
+	LSComponentAvailable const * component_init;
+	LSComponent* component;
+	GtkWidget* widget;
+	bool bad_config = false; /* Retval -- true when a component was skipped. */
+
+	ls_app_window_destroy_components(win);
+
+	if (win->game->component_config) {
+		component_config = &win->game->component_config[0];
+	} else {
+		/* No component config was given, use defaults! */
+		ls_app_window_default_components(win);
+		return false;
+	}
+
+    LOG_DEBUG("Creating components from split file...");
+
+	while (*component_config) {
+		if (json_is_string(*component_config)) {
+			/* "components": [
+			 *     { ... }, // other component
+			 *
+			 *     "this_component",
+			 *
+			 *     { ... }, // other component
+			 * ]
+			 *
+			 * ^^ Use default options for this component */
+			component_ref = NULL;
+			component_name = json_string_value(*component_config);
+		} else {
+			/* "components": [
+			 *     { ... }, // other component
+			 *
+			 *     {
+			 *         "component": "this_component",
+			 *         "option_one": "some_value",
+			 *         "option_two": "other_value",
+			 *         // ...
+			 *     },
+			 *
+			 *     { ... }, // other component
+			 * ]
+			 *
+			 * ^^ Use user-configured options for this component */
+			component_ref = json_object_get(*component_config, "component");
+			component_name = json_string_value(component_ref);
+		}
+
+		if (!component_name) {
+			/* This case should not occur; developer error if it does */
+			LOG_DEBUG("Unnamed component config");
+			bad_config = true;
+			++component_config;
+			continue;
+		} else if (!(component_init = get_component(component_name))) {
+			/* Occurs when the component name isn't matched.
+			 * I.E., user specifies `"components": [ "taimer" ]` */
+			LOG_WARNF("Unrecognized component `%s`", component_name);
+			bad_config = true;
+			++component_config;
+			continue;
+		}
+
+		if (component_ref) {
+			/* We don't use ref in the init call, but it's non-null if the
+			 * configuration is a JSON object */
+			component = component_init->new(*component_config);
+		} else {
+			/* ^^ otherwise it was a string, so use default options (by setting
+			 * the json object pointer to NULL.) */
+			component = component_init->new(NULL);
+		}
+
+        if (component) {
+            widget = component->ops->widget(component);
+            if (widget) {
+                gtk_widget_set_margin_start(widget, WINDOW_PAD);
+                gtk_widget_set_margin_end(widget, WINDOW_PAD);
+                gtk_container_add(GTK_CONTAINER(win->box), widget);
+            }
+            win->components = g_list_prepend(win->components, component);
+			LOG_DEBUGF("Registered component `%s`", component_name);
+        } else {
+			LOG_DEBUGF("Failed to create component `%s`", component_name);
+			bad_config = true;
+		}
+
+		++component_config; // Points to next component configuration (json object)
+    }
+
+	return bad_config;
+}
+
 void ls_app_window_open(LSAppWindow* win, const char* file)
 {
     LOG_DEBUG("Opening LibreSplit window");
@@ -151,19 +317,47 @@ void ls_app_window_open(LSAppWindow* win, const char* file)
         ls_runs_release(win->runs);
         win->runs = 0;
     }
+
     if (ls_game_create(&win->game, file, &error_msg)) {
         win->game = 0;
         if (error_msg) {
             char msg[PATH_MAX];
             snprintf(msg, sizeof msg, "%s\n%s", error_msg, file);
             ls_alert_error(GTK_WINDOW(win), "LibreSplit", "JSON parse error:", msg);
-            free(error_msg);
         }
     } else if (ls_timer_create(&win->timer, win->game)) {
         win->timer = 0;
     } else if (ls_runs_create(&win->runs)) {
         win->runs = 0;
-    } else {
+	} else if (ls_app_window_add_components(win)) {
+		
+		/* TODO: Probably outside the scope of these changes, this popup could
+		 * stand to be more helpful.
+		 *
+		 * Extra credit: maybe give options for "skip" or "use defaults."
+		 * Though, this has further implications on what to save back to the
+		 * splits file. */
+
+        // ^^ I've rebased against changes that add a helper function for this
+        // as well, so I should also include that.
+
+		error_popup = gtk_message_dialog_new(
+			GTK_WINDOW(win),
+			GTK_DIALOG_DESTROY_WITH_PARENT,
+			GTK_MESSAGE_INFO,
+			GTK_BUTTONS_OK,
+			"A component has been skipped because it failed to load.\n"
+			"Check the spelling in the selected splits file:\n%s",
+			file);
+		gtk_dialog_run(GTK_DIALOG(error_popup));
+
+		free(error_msg);
+		gtk_widget_destroy(error_popup);
+
+		/* Pending the above TODO, for now, this branch will always show the
+		 * game, but with bad component configs skipped. */
+
+        // TODO: Duplicated code for the rebase
         if (win->game->auto_splitter_file && win->game->auto_splitter_file[0] != '\0') {
             LOG_DEBUG("Opening autosplitter");
             struct stat st = { 0 };
@@ -173,10 +367,28 @@ void ls_app_window_open(LSAppWindow* win, const char* file)
                 strcpy(auto_splitter_file, win->game->auto_splitter_file);
             }
         }
-
         atomic_store(&auto_splitter_enabled, cfg.libresplit.auto_splitter_enabled.value.b);
         ls_app_window_show_game(win);
-    }
+		return; // success*!
+    } else {
+        // TODO: Duplicated code for the rebase
+        if (win->game->auto_splitter_file && win->game->auto_splitter_file[0] != '\0') {
+            LOG_DEBUG("Opening autosplitter");
+            struct stat st = { 0 };
+            if (stat(win->game->auto_splitter_file, &st) == -1) {
+                LOG_INFOF("Auto Splitter %s does not exist", win->game->auto_splitter_file);
+            } else {
+                strcpy(auto_splitter_file, win->game->auto_splitter_file);
+            }
+        }
+        atomic_store(&auto_splitter_enabled, cfg.libresplit.auto_splitter_enabled.value.b);
+        ls_app_window_show_game(win);
+		return; // success!
+	}
+
+	/* If the window failed to open, show the "empty" window (with the welcome
+	 * box visible) instead. */
+	ls_app_window_clear_game(win);
 }
 
 void ls_app_startup(GApplication* app)
@@ -411,8 +623,12 @@ void ls_app_window_destroy(GtkWidget* widget, gpointer data)
         ls_runs_release(win->runs);
         win->runs = 0;
     }
+
     atomic_store(&auto_splitter_enabled, 0);
     atomic_store(&exit_requested, 1);
+
+	ls_app_window_destroy_components(win);
+
     LOG_DEBUG("Exit request sent to threads");
     if (win->context_menu) {
         gtk_widget_unparent(win->context_menu);
@@ -559,7 +775,6 @@ static void ls_app_window_init(LSAppWindow* win)
     LOG_DEBUG("Initializing LibreSplit Window");
     const char* theme;
     const char* theme_variant;
-    int i;
 
     win->display = gdk_display_get_default();
     win->reset_style = NULL;
@@ -650,22 +865,9 @@ static void ls_app_window_init(LSAppWindow* win)
     gtk_widget_set_vexpand(win->box, TRUE);
     gtk_box_append(GTK_BOX(win->container), win->box);
 
-    // Create all available components (TODO: change this in the future)
-    LOG_DEBUG("Creating components...");
-    win->components = NULL;
-    for (i = 0; ls_components[i].name != NULL; i++) {
-        LSComponent* component = ls_components[i].new();
-        if (component) {
-            GtkWidget* widget = component->ops->widget(component);
-            if (widget) {
-                gtk_widget_set_margin_start(widget, WINDOW_PAD);
-                gtk_widget_set_margin_end(widget, WINDOW_PAD);
-                gtk_box_append(GTK_BOX(win->box),
-                    component->ops->widget(component));
-            }
-            win->components = g_list_append(win->components, component);
-        }
-    }
+
+	// (TODO*) NOTE: Moved the add component logic to the "add_components" subroutine (in game.c)
+	// ls_app_window_add_components(win); // Moved this to window_open
 
     // NOTE: This always creates an empty footer, no matter how many
     //  ^ "footers" are available, which may give issues with theming
