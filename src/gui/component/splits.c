@@ -140,7 +140,7 @@ static void append_quoted_uri(GString* str, const char* value)
 /**
  * Constructor
  */
-LSComponent* ls_component_splits_new(void)
+LSComponent* ls_component_splits_new(json_t* config)
 {
     LSSplits* self;
     self = calloc(1, sizeof(LSSplits));
@@ -403,6 +403,8 @@ static void splits_show_game(LSComponent* self_, const ls_game* game,
  */
 static void splits_clear_game(LSComponent* self_)
 {
+	printf("(remove me) CLEARING SPLITS\n");
+
     LSSplits* self = (LSSplits*)self_;
     int i;
     g_clear_signal_handler(&self->scroll_changed_handler, self->split_adjust);

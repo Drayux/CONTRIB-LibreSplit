@@ -2,6 +2,7 @@
 
 #include "src/lasr/settings.h"
 #include "src/settings/definitions.h"
+
 #include <jansson.h>
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -72,6 +73,7 @@ typedef struct ls_game {
     atomic_bool has_unsaved_rainbow;
     UserSetting** auto_splitter_settings;
     size_t auto_splitter_settings_count;
+	json_t** component_config; // NULL-terminated list of components
 } ls_game;
 
 /**

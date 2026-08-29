@@ -26,7 +26,7 @@ extern LSComponentOps ls_detailed_timer_operations;
 /**
  * Constructor
  */
-LSComponent* ls_component_detailed_timer_new(void)
+LSComponent* ls_component_detailed_timer_new(json_t* config)
 {
     LSDetailedTimer* self;
     GtkWidget* spacer;

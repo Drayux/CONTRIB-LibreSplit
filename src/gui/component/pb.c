@@ -19,7 +19,7 @@ extern LSComponentOps ls_pb_operations;
 /**
  * Constructor
  */
-LSComponent* ls_component_pb_new(void)
+LSComponent* ls_component_pb_new(json_t* config)
 {
     LSPb* self;
     GtkWidget* label;

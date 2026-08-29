@@ -3,6 +3,7 @@
 
 #include <ctype.h>
 #include <gtk/gtk.h>
+#include <jansson.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -35,10 +36,12 @@ typedef struct LSComponentOps {
 
 typedef struct LSComponentAvailable {
     char* name;
-    LSComponent* (*new)(void);
+    LSComponent* (*new)(json_t* config);
 } LSComponentAvailable;
 
 // A NULL-terminated array of all available components
-extern LSComponentAvailable ls_components[];
+extern LSComponentAvailable const ls_components[];
+
+LSComponentAvailable const * get_component(char const * const name);
 
 #endif /* __COMPONENTS_H__ */

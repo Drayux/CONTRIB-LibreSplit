@@ -22,7 +22,7 @@ extern LSComponentOps ls_lua_title_operations; // defined at the end of the file
 /**
  * Constructor
  */
-LSComponent* ls_component_lua_title_new(void)
+LSComponent* ls_component_lua_title_new(json_t* config)
 {
     LSLuaTitle* self;
 
