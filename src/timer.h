@@ -1,6 +1,7 @@
 #pragma once
 
 #include "src/settings/definitions.h"
+
 #include <jansson.h>
 #include <stdatomic.h>
 #include <stdbool.h>
@@ -53,6 +54,7 @@ typedef struct ls_game {
     ls_time* segment_times;
     ls_time* best_splits;
     ls_time* best_segments;
+	json_t** component_config; // NULL-terminated list of components
 } ls_game;
 
 /**

@@ -145,9 +145,9 @@ void ls_app_window_open(LSAppWindow* win, const char* file)
                 GTK_DIALOG_DESTROY_WITH_PARENT,
                 GTK_MESSAGE_INFO,
                 GTK_BUTTONS_OK,
-                "JSON parse error: %s\n%s",
-                error_msg,
-                file);
+                "Error loading splits file: %s\n%s",
+                file,
+                error_msg);
             gtk_dialog_run(GTK_DIALOG(error_popup));
 
             free(error_msg);
@@ -155,7 +155,7 @@ void ls_app_window_open(LSAppWindow* win, const char* file)
         }
     } else if (ls_timer_create(&win->timer, win->game)) {
         win->timer = 0;
-    } else {
+	} else {
         ls_app_window_show_game(win);
     }
 }
@@ -406,7 +406,6 @@ static void ls_app_window_init(LSAppWindow* win)
     LOG_DEBUG("Initializing LibreSplit Window");
     const char* theme;
     const char* theme_variant;
-    int i;
 
     win->display = gdk_display_get_default();
     win->style = NULL;
@@ -491,22 +490,8 @@ static void ls_app_window_init(LSAppWindow* win)
     gtk_widget_set_vexpand(win->box, TRUE);
     gtk_container_add(GTK_CONTAINER(win->container), win->box);
 
-    // Create all available components (TODO: change this in the future)
-    LOG_DEBUG("Creating components...");
-    win->components = NULL;
-    for (i = 0; ls_components[i].name != NULL; i++) {
-        LSComponent* component = ls_components[i].new();
-        if (component) {
-            GtkWidget* widget = component->ops->widget(component);
-            if (widget) {
-                gtk_widget_set_margin_start(widget, WINDOW_PAD);
-                gtk_widget_set_margin_end(widget, WINDOW_PAD);
-                gtk_container_add(GTK_CONTAINER(win->box),
-                    component->ops->widget(component));
-            }
-            win->components = g_list_append(win->components, component);
-        }
-    }
+	// (TODO*) NOTE: Moved the add component logic to the "add_components" subroutine (in game.c)
+	// ls_app_window_add_components(win); // Moved this to window_open
 
     // NOTE: This always creates an empty footer, no matter how many
     //  ^ "footers" are available, which may give issues with theming

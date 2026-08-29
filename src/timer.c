@@ -406,14 +406,13 @@ int ls_game_create(ls_game** game_ptr, const char* path, char** error_msg)
     json = json_load_file(game->path, 0, &json_error);
     if (!json) {
         error = 1;
-        size_t msg_len = snprintf(NULL, 0, "%s (%d:%d)", json_error.text, json_error.line, json_error.column);
+        size_t msg_len = snprintf(NULL, 0, "JSON parse error %s (%d:%d)", json_error.text, json_error.line, json_error.column);
         *error_msg = calloc(msg_len + 1, sizeof(char));
         if (*error_msg == NULL) {
             LOG_ERR("Cannot allocate memory for error message");
-            error = 1;
             goto game_create_error;
         }
-        sprintf(*error_msg, "%s (%d:%d)", json_error.text, json_error.line, json_error.column);
+        sprintf(*error_msg, "JSON parse error %s (%d:%d)", json_error.text, json_error.line, json_error.column);
         goto game_create_error;
     }
     // copy title
@@ -485,18 +484,70 @@ int ls_game_create(ls_game** game_ptr, const char* path, char** error_msg)
     if (ref) {
         json_time_get(ref, &game->world_record);
     }
+	// get component config
+    ref = json_object_get(json, "components");
+    if (ref && !json_is_null(ref)) {
+		/* If defined, must be an array */
+		if (!json_is_array(ref)) {
+			error = 1;
+			*error_msg = strdup("Component config provided but is not an array");
+			if (*error_msg == NULL) {
+				LOG_ERR("Cannot allocate memory for error message");
+			}
+			goto game_create_error;
+		} else if (json_array_size(ref) == 0) {
+			error = 1;
+			*error_msg = strdup("Component config provided but is empty");
+			if (*error_msg == NULL) {
+				LOG_ERR("Cannot allocate memory for error message");
+			}
+			goto game_create_error;
+		} else if (!(game->component_config = calloc(json_array_size(ref) + 1, sizeof(json_t*)))) {
+			error = 1;
+			*error_msg = strdup("Not enough memory for component config array");
+			if (*error_msg == NULL) {
+				LOG_ERR("Cannot allocate memory for error message");
+			}
+			goto game_create_error;
+		}
+
+		int num_components = 0;
+		json_t* component_cfg;
+		for (size_t i = 0; i < json_array_size(ref); ++i) {
+			component_cfg = json_array_get(ref, i);
+
+			/* TODO: This is a preliminary check that the component json is
+			 * structured correctly. For now, this is considered an error.
+			 * Alas, we can't reasonably check the component config itself
+			 * until trying to create it, so maybe this is not the best spot
+			 * for this. */
+
+			/* SECOND TODO: It seems that checking this is trivial during the
+			 * show game phase, and it would be easy to "skip" or fallback to
+			 * defaults. Additionally, maybe a component does not have to be
+			 * a json object if someone only cares to modify the order of
+			 * select components, so asserting this may be unnecessary. */
+
+			if (!json_is_string(json_object_get(component_cfg, "component"))) {
+				error = 1;
+				*error_msg = strdup("Unnamed component config given");
+				goto game_create_error;
+			}
+
+			/* Each component validates its own sub-config. */
+			game->component_config[num_components++] = component_cfg;
+			json_incref(component_cfg); // will be decremented during component init
+										// (TODO: or game cleanup if not shown)
+		}
+	}
     // get splits
     ref = json_object_get(json, "splits");
     if (!json_is_array(ref) || json_array_size(ref) == 0) {
         error = 1;
-        size_t msg_len = snprintf(NULL, 0, "Split file must contain a non-empty splits array");
-        *error_msg = calloc(msg_len + 1, sizeof(char));
+		*error_msg = strdup("Split file must contain a non-empty splits array");
         if (*error_msg == NULL) {
             LOG_ERR("Cannot allocate memory for error message");
-            error = 1;
-            goto game_create_error;
         }
-        sprintf(*error_msg, "Split file must contain a non-empty splits array");
         goto game_create_error;
     }
     if (ref) {
