@@ -340,6 +340,8 @@ void ls_delta_string(char* string, long long time)
  */
 void ls_game_release(ls_game* game)
 {
+	json_t ** component_config;
+
     LOG_DEBUG("Releasing game...");
     if (game->title) {
         free(game->title);
@@ -353,6 +355,15 @@ void ls_game_release(ls_game* game)
         free(game->theme_variant);
         game->theme_variant = 0;
     }
+	if (game->component_config) {
+		component_config = &game->component_config[0];
+		while (*component_config) {
+			json_decref(*component_config);
+			++component_config;
+		}
+		free(game->component_config);
+		game->component_config = NULL;
+	}
     if (game->split_titles) {
         for (unsigned int i = 0; i < game->split_count; ++i) {
             if (game->split_titles[i]) {
@@ -789,6 +800,7 @@ int ls_game_save(const ls_game* game)
     char str[256];
     json_t* json = json_object();
     json_t* splits = json_array();
+	json_t ** component_config;
     if (game->title) {
         json_object_set_new(json, "title", json_string(game->title));
     }
@@ -809,6 +821,21 @@ int ls_game_save(const ls_game* game)
         ls_time_string_serialized(str, game->start_delay);
         json_object_set_new(json, "start_delay", json_string(str));
     }
+	if ((component_config = game->component_config)) {
+		json_t* component_list = json_array();
+		while (*component_config) {
+			/* Increments refcount (presumably to 2) during the save operation
+			 * which is dropped (presumably back to 1) once `json_t* json` is
+			 * dropped. Final ref only cleared when the app window changes.
+			 *
+			 * Holding the reference in game allows us to preserve configs,
+			 * even if they are invalid, so users can tweak a typo, rather than
+			 * rewrite the entire object json. */
+			json_array_append(component_list, *component_config);
+			++component_config;
+		}
+		json_object_set_new(json, "components", component_list);
+	}
     for (unsigned int i = 0; i < game->split_count; ++i) {
         json_t* split = json_object();
         json_object_set_new(split, "title", json_string(game->split_titles[i]));

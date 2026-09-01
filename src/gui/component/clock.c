@@ -65,7 +65,7 @@ LSComponent* ls_component_timer_new(void)
  *
  * @param self The clock component itself
  */
-static void ls_timer_delete(LSComponent* self)
+static void ls_timer_delete(LSComponent* self_)
 {
     free(self);
 }

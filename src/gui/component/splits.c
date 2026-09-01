@@ -298,6 +298,8 @@ static void splits_show_game(LSComponent* self_, const ls_game* game,
  */
 static void splits_clear_game(LSComponent* self_)
 {
+	printf("(remove me) CLEARING SPLITS\n");
+
     LSSplits* self = (LSSplits*)self_;
     int i;
     gtk_widget_hide(self->splits);

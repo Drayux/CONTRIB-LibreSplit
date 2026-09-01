@@ -122,6 +122,127 @@ LSAppWindow* ls_app_window_new(LSApp* app)
     return win;
 }
 
+static void ls_app_window_destroy_components(LSAppWindow* win)
+{
+	if (!win || !win->components) {
+		return;
+	}
+
+    LOG_DEBUG("Destroying components...");
+
+	/* Remove all widgets in the widget box */
+	GList* l = gtk_container_get_children(GTK_CONTAINER(win->box));
+	for (; l != NULL; l = l->next) {
+		GtkWidget* w = GTK_WIDGET(l->data);
+		gtk_container_remove(GTK_CONTAINER(win->box), w);
+	}
+
+	/* Call the delete method for all tracked components.
+	 * NOTE: The refcount of the component's corresponding GtkWidget(s) is
+	 * dropped to 0 when the container is removed above. Thus, the delete
+	 * logic need not destroy this itself. */
+	for (l = win->components; l != NULL; l = l->next) {
+        LSComponent* c = l->data;
+		if (c && c->ops->delete) {
+			c->ops->delete(c);
+		} else {
+			LOG_DEBUG("Skipped release of component with no delete method.");
+		}
+    }
+
+	g_list_free(win->components);
+    win->components = NULL;
+}
+
+static void ls_app_window_default_components(LSAppWindow* win)
+{
+    LOG_DEBUG("Creating default components...");
+
+	// TODO: better defaults, just proof of concept right now
+	// ^^ Maybe better to make this static so we don't keep searching for it?
+	LSComponentAvailable const * default_components[] = {
+		get_component("title"),
+		get_component("splits"),
+		get_component("timer"),
+		/* --- */
+		NULL
+	};
+
+	LSComponentAvailable const ** component_init;
+	LSComponent* component;
+	GtkWidget* widget;
+
+	component_init = &default_components[0];
+
+	while (*component_init) {
+        if ((component = (*component_init)->new())) {
+            widget = component->ops->widget(component);
+            if (widget) {
+                gtk_widget_set_margin_start(widget, WINDOW_PAD);
+                gtk_widget_set_margin_end(widget, WINDOW_PAD);
+                gtk_container_add(GTK_CONTAINER(win->box),
+                    component->ops->widget(component));
+            }
+            win->components = g_list_append(win->components, component);
+        }
+		++component_init;
+	}
+}
+
+static void ls_app_window_add_components(LSAppWindow* win)
+{
+	json_t ** component_config;
+	json_t * component_ref;
+	char const * component_name;
+	LSComponentAvailable const * component_init;
+	LSComponent* component;
+	GtkWidget* widget;
+
+	ls_app_window_destroy_components(win);
+
+	if (win->game->component_config) {
+		component_config = &win->game->component_config[0];
+	} else {
+		/* No component config was given, use defaults! */
+		ls_app_window_default_components(win);
+		return;
+	}
+
+    LOG_DEBUG("Creating components from split file...");
+
+	while (*component_config) {
+		component_ref = json_object_get(*component_config, "component");
+		component_name = json_string_value(component_ref);
+		if (!component_name) {
+			// TODO: This might be more helpful as a popup to the user
+			// ^^ Extra credit: maybe give options for "skip" or "use default"
+			// ^^ Though, this has implications on what to save
+			LOG_DEBUG("Invalid component config");
+			break;
+		} else if (!(component_init = get_component(component_name))) {
+			// TODO: see above comment ^^
+			LOG_DEBUGF("Unrecognized component `%s`", component_name);
+			break;
+		}
+
+		// TODO: Pass config here!!
+        component = component_init->new();
+
+        if (component) {
+            widget = component->ops->widget(component);
+            if (widget) {
+                gtk_widget_set_margin_start(widget, WINDOW_PAD);
+                gtk_widget_set_margin_end(widget, WINDOW_PAD);
+                gtk_container_add(GTK_CONTAINER(win->box), widget);
+            }
+            win->components = g_list_prepend(win->components, component);
+			LOG_DEBUGF("Registered component `%s`", component_name);
+        }
+
+		++component_config; // Points to next component configuration (json object)
+    }
+}
+
 void ls_app_window_open(LSAppWindow* win, const char* file)
 {
     LOG_DEBUG("Opening LibreSplit window");
@@ -156,6 +277,8 @@ void ls_app_window_open(LSAppWindow* win, const char* file)
     } else if (ls_timer_create(&win->timer, win->game)) {
         win->timer = 0;
 	} else {
+		// TODO: Could follow the else-if chain if we wanted to fail on bad config
+		ls_app_window_add_components(win);
         ls_app_window_show_game(win);
     }
 }
@@ -291,6 +414,7 @@ void ls_app_window_destroy(GtkWidget* widget, gpointer data)
         ls_game_release(win->game);
         win->game = 0;
     }
+	ls_app_window_destroy_components(win);
     atomic_store(&auto_splitter_enabled, 0);
     atomic_store(&exit_requested, 1);
     LOG_DEBUG("Exit request sent to threads");
@@ -489,9 +613,6 @@ static void ls_app_window_init(LSAppWindow* win)
     gtk_widget_set_margin_bottom(win->box, 0);
     gtk_widget_set_vexpand(win->box, TRUE);
     gtk_container_add(GTK_CONTAINER(win->container), win->box);
-
-	// (TODO*) NOTE: Moved the add component logic to the "add_components" subroutine (in game.c)
-	// ls_app_window_add_components(win); // Moved this to window_open
 
     // NOTE: This always creates an empty footer, no matter how many
     //  ^ "footers" are available, which may give issues with theming

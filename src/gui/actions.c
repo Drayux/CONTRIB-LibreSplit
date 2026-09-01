@@ -240,6 +240,8 @@ void close_activated(GSimpleAction* action,
     GVariant* parameter,
     gpointer app)
 {
+	printf("(remove me) close activated\n");
+
     GList* windows;
     LSAppWindow* win;
     if (parameter != NULL) {
