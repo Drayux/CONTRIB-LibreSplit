@@ -175,7 +175,7 @@ static void ls_app_window_default_components(LSAppWindow* win)
 	component_init = &default_components[0];
 
 	while (*component_init) {
-        if ((component = (*component_init)->new())) {
+        if ((component = (*component_init)->new(NULL))) {
             widget = component->ops->widget(component);
             if (widget) {
                 gtk_widget_set_margin_start(widget, WINDOW_PAD);
@@ -189,14 +189,15 @@ static void ls_app_window_default_components(LSAppWindow* win)
 	}
 }
 
-static void ls_app_window_add_components(LSAppWindow* win)
+static bool ls_app_window_add_components(LSAppWindow* win)
 {
-	json_t ** component_config;
+	json_t ** component_config; /* List of pointers (json objects) */
 	json_t * component_ref;
 	char const * component_name;
 	LSComponentAvailable const * component_init;
 	LSComponent* component;
 	GtkWidget* widget;
+	bool bad_config = false; /* Retval -- true when a component was skipped. */
 
 	ls_app_window_destroy_components(win);
 
@@ -205,28 +206,67 @@ static void ls_app_window_add_components(LSAppWindow* win)
 	} else {
 		/* No component config was given, use defaults! */
 		ls_app_window_default_components(win);
-		return;
+		return false;
 	}
 
     LOG_DEBUG("Creating components from split file...");
 
 	while (*component_config) {
-		component_ref = json_object_get(*component_config, "component");
-		component_name = json_string_value(component_ref);
-		if (!component_name) {
-			// TODO: This might be more helpful as a popup to the user
-			// ^^ Extra credit: maybe give options for "skip" or "use default"
-			// ^^ Though, this has implications on what to save
-			LOG_DEBUG("Invalid component config");
-			break;
-		} else if (!(component_init = get_component(component_name))) {
-			// TODO: see above comment ^^
-			LOG_DEBUGF("Unrecognized component `%s`", component_name);
-			break;
+		if (json_is_string(*component_config)) {
+			/* "components": [
+			 *     { ... }, // other component
+			 *
+			 *     "this_component",
+			 *
+			 *     { ... }, // other component
+			 * ]
+			 *
+			 * ^^ Use default options for this component */
+			component_ref = NULL;
+			component_name = json_string_value(*component_config);
+		} else {
+			/* "components": [
+			 *     { ... }, // other component
+			 *
+			 *     {
+			 *         "component": "this_component",
+			 *         "option_one": "some_value",
+			 *         "option_two": "other_value",
+			 *         // ...
+			 *     },
+			 *
+			 *     { ... }, // other component
+			 * ]
+			 *
+			 * ^^ Use user-configured options for this component */
+			component_ref = json_object_get(*component_config, "component");
+			component_name = json_string_value(component_ref);
 		}
 
-		// TODO: Pass config here!!
-        component = component_init->new();
+		if (!component_name) {
+			/* This case should not occur; developer error if it does */
+			LOG_DEBUG("Unnamed component config");
+			bad_config = true;
+			++component_config;
+			continue;
+		} else if (!(component_init = get_component(component_name))) {
+			/* Occurs when the component name isn't matched.
+			 * I.E., user specifies `"components": [ "taimer" ]` */
+			LOG_WARNF("Unrecognized component `%s`", component_name);
+			bad_config = true;
+			++component_config;
+			continue;
+		}
+
+		if (component_ref) {
+			/* We don't use ref in the init call, but it's non-null if the
+			 * configuration is a JSON object */
+			component = component_init->new(*component_config);
+		} else {
+			/* ^^ otherwise it was a string, so use default options (by setting
+			 * the json object pointer to NULL.) */
+			component = component_init->new(NULL);
+		}
 
         if (component) {
             widget = component->ops->widget(component);
@@ -237,10 +277,15 @@ static void ls_app_window_add_components(LSAppWindow* win)
             }
             win->components = g_list_prepend(win->components, component);
 			LOG_DEBUGF("Registered component `%s`", component_name);
-        }
+        } else {
+			LOG_DEBUGF("Failed to create component `%s`", component_name);
+			bad_config = true;
+		}
 
 		++component_config; // Points to next component configuration (json object)
     }
+
+	return bad_config;
 }
 
 void ls_app_window_open(LSAppWindow* win, const char* file)
@@ -258,6 +303,7 @@ void ls_app_window_open(LSAppWindow* win, const char* file)
         ls_game_release(win->game);
         win->game = 0;
     }
+
     if (ls_game_create(&win->game, file, &error_msg)) {
         win->game = 0;
         if (error_msg) {
@@ -276,11 +322,40 @@ void ls_app_window_open(LSAppWindow* win, const char* file)
         }
     } else if (ls_timer_create(&win->timer, win->game)) {
         win->timer = 0;
-	} else {
-		// TODO: Could follow the else-if chain if we wanted to fail on bad config
-		ls_app_window_add_components(win);
+	} else if (ls_app_window_add_components(win)) {
+		
+		/* TODO: Probably outside the scope of these changes, this popup could
+		 * stand to be more helpful.
+		 *
+		 * Extra credit: maybe give options for "skip" or "use defaults."
+		 * Though, this has further implications on what to save back to the
+		 * splits file. */
+
+		error_popup = gtk_message_dialog_new(
+			GTK_WINDOW(win),
+			GTK_DIALOG_DESTROY_WITH_PARENT,
+			GTK_MESSAGE_INFO,
+			GTK_BUTTONS_OK,
+			"A component has been skipped because it failed to load.\n"
+			"Check the spelling in the selected splits file:\n%s",
+			file);
+		gtk_dialog_run(GTK_DIALOG(error_popup));
+
+		free(error_msg);
+		gtk_widget_destroy(error_popup);
+
+		/* Pending the above TODO, for now, this branch will always show the
+		 * game, but with bad component configs skipped. */
         ls_app_window_show_game(win);
-    }
+		return; // success*!
+    } else {
+        ls_app_window_show_game(win);
+		return; // success!
+	}
+
+	/* If the window failed to open, show the "empty" window (with the welcome
+	 * box visible) instead. */
+	ls_app_window_clear_game(win);
 }
 
 /**

@@ -18,7 +18,7 @@ extern LSComponentOps ls_timer_operations;
 /**
  * Constructor
  */
-LSComponent* ls_component_timer_new(void)
+LSComponent* ls_component_timer_new(json_t* config)
 {
     LSTimer* self;
     GtkWidget* spacer;
@@ -67,7 +67,7 @@ LSComponent* ls_component_timer_new(void)
  */
 static void ls_timer_delete(LSComponent* self_)
 {
-    free(self);
+    free(self_);
 }
 
 /**

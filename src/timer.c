@@ -522,33 +522,27 @@ int ls_game_create(ls_game** game_ptr, const char* path, char** error_msg)
 			goto game_create_error;
 		}
 
+		/* This is the first of two validation checks for the component config.
+		 * If the asserted conditions are not met, then it is not supported to
+		 * load and subsequently save without losing the original, albeit
+		 * invalid, splits file. Futher errors can be handled gracefully. */
 		int num_components = 0;
 		json_t* component_cfg;
 		for (size_t i = 0; i < json_array_size(ref); ++i) {
 			component_cfg = json_array_get(ref, i);
 
-			/* TODO: This is a preliminary check that the component json is
-			 * structured correctly. For now, this is considered an error.
-			 * Alas, we can't reasonably check the component config itself
-			 * until trying to create it, so maybe this is not the best spot
-			 * for this. */
-
-			/* SECOND TODO: It seems that checking this is trivial during the
-			 * show game phase, and it would be easy to "skip" or fallback to
-			 * defaults. Additionally, maybe a component does not have to be
-			 * a json object if someone only cares to modify the order of
-			 * select components, so asserting this may be unnecessary. */
-
-			if (!json_is_string(json_object_get(component_cfg, "component"))) {
+			// 'Whitelist' validation logic
+			if (json_is_string(component_cfg));
+			else if (json_is_string(json_object_get(component_cfg, "component")));
+			else {
 				error = 1;
-				*error_msg = strdup("Unnamed component config given");
+				*error_msg = strdup("Invalid component config given");
 				goto game_create_error;
 			}
 
 			/* Each component validates its own sub-config. */
 			game->component_config[num_components++] = component_cfg;
-			json_incref(component_cfg); // will be decremented during component init
-										// (TODO: or game cleanup if not shown)
+			json_incref(component_cfg); // held for lifetime of ls_game
 		}
 	}
     // get splits

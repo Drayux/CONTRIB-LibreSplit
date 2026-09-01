@@ -50,7 +50,7 @@ void free_all(LSSplits* self_)
 /**
  * Constructor
  */
-LSComponent* ls_component_splits_new(void)
+LSComponent* ls_component_splits_new(json_t* config)
 {
     LSSplits* self;
 
