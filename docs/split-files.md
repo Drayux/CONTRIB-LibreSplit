@@ -22,6 +22,7 @@ You can use splits located in [the resource repository](https://github.com/Libre
 | `height`                 | int                | Window height                                       |
 | `auto_splitter`          | string             | Path to your auto splitter Lua script               |
 | `auto_splitter_settings` | object             | Optional settings for your auto splitter            |
+| `components`             | array              | Advanced configuration of timer components          |
 
 Most of the above keys are optional.
 `comparison_method` determines which time is authoritative for determining things like PBs and best splits.
@@ -106,3 +107,97 @@ a game has no autosplitter at all for example.
 
 Since this hypothetical example uses a `comparison_method` of game_time, it is possible for the `real_time` section of any of the splits to be slower than a prior
 `real_time` value, since only `game_time` needs to be faster for you to record a gold or a PB.
+
+## Advanced Configuration
+Many of the GUI elements displayed on the timer -- **components** -- have configurable options.
+
+### Hiding Components
+If the `components` array is specified in the splits file, only those listed will be visible.
+
+```json
+{
+  "title": "Lunch - Seven Cartons of Milk%",
+  "components": [
+    "title",
+    "splits",
+    "timer"
+  ],
+  "splits": [
+  ], // ...
+```
+
+In the above configuration, only the run title, splits, and a timer will be shown. Previous segment, sum of best, etc., will not be shown.
+
+### Changing the Order
+Perhaps you would prefer the detailed timer is on top of the splits, this is also supported! The components are parsed in the order they are given in the array.
+
+```json
+{
+  "title": "Lunch - Seven Cartons of Milk%",
+  "components": [
+    "timer",
+    "pb",
+    "wr",
+    "splits"
+  ],
+  "splits": [
+  ], // ...
+```
+
+This configuration would create a window where the main timer is at the very top, followed by your personal best, the world record (if set), and the splits (as defined in the `splits` portion of this file.)
+
+### Component Configuration
+Valid types for the components are strings, shown above, or nested JSON objects. If a component is defined with a JSON object, it must contain, at the minimum, the component's name under the key `component`:
+
+```json
+{
+  "component": "prev-segment"
+}
+```
+
+Within this JSON object, any supported configuration options may be provided. For any that are absent, the default will value will be used. Thus, a component configuration object need never be exhaustive.
+
+```json
+{
+  "title": "Skyrim - Game Crash%",
+  "components": [
+    "title",
+    {
+      "component": "splits",
+      "height": 5
+    },
+    {
+      "component": "text-box",
+      "class": "health",
+      "left": "Health"
+      "right": ":PlayerHealth"
+    },
+    {
+      "component": "text-box",
+      "class": "mana",
+      "left": "Mana"
+      "right": ":ManaLevel"
+    }
+  ],
+  "splits": [
+  ], // ...
+```
+
+This configuration creates a timer with the normal run title, splits with a maximum of 5 splits shown, and two variable-information text boxes, each tracking a value set in the auto-splitter Lua runtime (see [[../auto-splitters.md]].) Notice the multiplicity of the "text-box" element: Libresplit supports multiple instances of any component.
+
+### Component Options Compendium
+
+| Component      | Option        | Type                 | Description                                                                                                               |
+|----------------|---------------|----------------------|---------------------------------------------------------------------------------------------------------------------------|
+| title          |               |                      | A static, centered text object that displays the title of the current run category.                                       |
+|                | source        | enum: run, `:luavar` | The origin of the text to be displayed. Always the title in the splits file unless a specified :luavar is a string value. |
+| splits         |               |                      | A tabular display of the levels that comprise a run.                                                                      |
+| -> (WIP)       | height        | int                  | The maximum number of splits to be displayed at a time.                                                                   |
+| -> (WIP)       | pin-final     | bool                 | Always display the final split.                                                                                           |
+| -> (WIP)       | reverse       | bool                 | If set (true) then the splits will be ordered from bottom to top.                                                         |
+| timer          |               |                      | The current run time.                                                                                                     |
+|                | simple        | bool                 | If set (true) then only a basic timer will be displayed (no additional information.)                                      |
+| prev-segment   |               |                      | Shows timing information about the most recently completed level during a run.                                            |
+| best-sum       |               |                      | Displays the possible run time when composing the sum of each best segment time.                                          |
+| pb             |               |                      | Displays the fastest "personal best" time for this run category.                                                          |
+| wr             |               |                      | Displays the fastest "world record" time for this run category.                                                           |
