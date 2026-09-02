@@ -63,6 +63,7 @@ LSComponent* ls_component_detailed_timer_new(json_t* config)
     self->time = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
     add_class(self->time, "timer");
     add_class(self->time, "time");
+	add_class(self->time, "delay");
     gtk_box_pack_start(GTK_BOX(self->detailed_time), self->time, FALSE, FALSE, 0);
     gtk_widget_show(self->time);
 
