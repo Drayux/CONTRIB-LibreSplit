@@ -122,6 +122,13 @@ LSAppWindow* ls_app_window_new(LSApp* app)
     return win;
 }
 
+/**
+ * Removes all configurable timer components from the LibreSplit window and
+ * releases the memory of the parent component object. The window will become
+ * "empty" if only this function is ran.
+ *
+ * @param win The current main app window
+ */
 static void ls_app_window_destroy_components(LSAppWindow* win)
 {
 	if (!win || !win->components) {
@@ -140,7 +147,7 @@ static void ls_app_window_destroy_components(LSAppWindow* win)
 	/* Call the delete method for all tracked components.
 	 * NOTE: The refcount of the component's corresponding GtkWidget(s) is
 	 * dropped to 0 when the container is removed above. Thus, the delete
-	 * logic need not destroy this itself. */
+	 * logic need not destroy these. */
 	for (l = win->components; l != NULL; l = l->next) {
         LSComponent* c = l->data;
 		if (c && c->ops->delete) {
@@ -154,6 +161,15 @@ static void ls_app_window_destroy_components(LSAppWindow* win)
     win->components = NULL;
 }
 
+/**
+ * Creates all default timer components, each with the default configuration
+ * and places the corresponding GTK widget into the LibreSplit window.
+ *
+ * Remove these components by calling ls_app_window_destroy_components() with
+ * the same window parameter.
+ *
+ * @param win The current main app window
+ */
 static void ls_app_window_default_components(LSAppWindow* win)
 {
     LOG_DEBUG("Creating default components...");
@@ -189,6 +205,20 @@ static void ls_app_window_default_components(LSAppWindow* win)
 	}
 }
 
+/**
+ * Creates timer components from a list of component configurations (json_t *
+ * objects.) If the json reference is a string, then the component will be created
+ * with default options. If it is a json object, then all applicable options
+ * provided will be used during initalization. These components are then placed
+ * into the LibreSplit window.
+ *
+ * Remove these components by calling ls_app_window_destroy_components() with
+ * the same window parameter.
+ *
+ * @param win The current main app window
+ *
+ * @return False if no errors were encountered, true otherwise.
+ */
 static bool ls_app_window_add_components(LSAppWindow* win)
 {
 	json_t ** component_config; /* List of pointers (json objects) */
@@ -288,6 +318,19 @@ static bool ls_app_window_add_components(LSAppWindow* win)
 	return bad_config;
 }
 
+/**
+ * Central call to create the main LibreSplit window. Doing so implies the
+ * creation of an internal timer object, parsing the game (splits) file,
+ * generating and showing the GUI.
+ *
+ * If any of these steps fail, a fallback window will be shown. Resources will
+ * still be allocated, but should be released with ls_app_window_destroy() by
+ * the caller.
+ *
+ * @param win A reference to the existing or new window type which holds the
+ * timer objects.
+ * @param file A file path indicating the game (splits) file to be loaded.
+ */
 void ls_app_window_open(LSAppWindow* win, const char* file)
 {
     LOG_DEBUG("Opening LibreSplit window");
