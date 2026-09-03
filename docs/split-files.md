@@ -162,13 +162,13 @@ Within this JSON object, any supported configuration options may be provided. Fo
       "height": 5
     },
     {
-      "component": "text-box",
+      "component": "info-box",
       "class": "health",
       "left": "Health"
       "right": ":PlayerHealth"
     },
     {
-      "component": "text-box",
+      "component": "info-box",
       "class": "mana",
       "left": "Mana"
       "right": ":ManaLevel"
@@ -182,17 +182,19 @@ This configuration creates a timer with the normal run title, splits with a maxi
 
 ### Component Options Compendium
 
-| Component      | Option        | Type                 | Description                                                                                                               |
-|----------------|---------------|----------------------|---------------------------------------------------------------------------------------------------------------------------|
-| title          |               |                      | A static, centered text object that displays the title of the current run category.                                       |
-|                | source        | enum: run, `:luavar` | The origin of the text to be displayed. Always the title in the splits file unless a specified :luavar is a string value. |
-| splits         |               |                      | A tabular display of the levels that comprise a run.                                                                      |
-| -> (WIP)       | height        | int                  | The maximum number of splits to be displayed at a time.                                                                   |
-| -> (WIP)       | pin-final     | bool                 | Always display the final split.                                                                                           |
-| -> (WIP)       | reverse       | bool                 | If set (true) then the splits will be ordered from bottom to top.                                                         |
-| timer          |               |                      | The current run time.                                                                                                     |
-|                | simple        | bool                 | If set (true) then only a basic timer will be displayed (no additional information.)                                      |
-| prev-segment   |               |                      | Shows timing information about the most recently completed level during a run.                                            |
-| best-sum       |               |                      | Displays the possible run time when composing the sum of each best segment time.                                          |
-| pb             |               |                      | Displays the fastest "personal best" time for this run category.                                                          |
-| wr             |               |                      | Displays the fastest "world record" time for this run category.                                                           |
+| Component      | Option        | Type                            | Description                                                                                                                   |
+|----------------|---------------|---------------------------------|-------------------------------------------------------------------------------------------------------------------------------|
+| title          |               |                                 | A static, centered text object that displays the title of the current run category.                                           |
+|                | source        | str - `:luavar`                 | The origin of the text to be displayed. Always the title in the splits file unless a specified :luavar is a string value.     |
+|                | simple        | bool                            | If set (true) display only the title (not the run number.)                                                                    |
+| splits         |               |                                 | A tabular display of the levels that comprise a run.                                                                          |
+| -> (WIP)       | height        | int                             | The maximum number of splits to be displayed at a time.                                                                       |
+| -> (WIP)       | pin-final     | bool                            | Always display the final split.                                                                                               |
+| -> (WIP)       | reverse       | bool                            | If set (true) then the splits will be ordered from bottom to top.                                                             |
+| timer          |               |                                 | The current run time.                                                                                                         |
+|                | simple        | bool                            | If set (true) then only a basic timer will be displayed (no additional information.)                                          |
+|                | source        | str - `real`, `game`, `:luavar` | Overrides the global timing method for this run. I.E., allows for a run that uses game time but requires a real time display. |
+| prev-segment   |               |                                 | Shows timing information about the most recently completed level during a run.                                                |
+| best-sum       |               |                                 | Displays the possible run time when composing the sum of each best segment time.                                              |
+| pb             |               |                                 | Displays the fastest "personal best" time for this run category.                                                              |
+| wr             |               |                                 | Displays the fastest "world record" time for this run category.                                                               |
