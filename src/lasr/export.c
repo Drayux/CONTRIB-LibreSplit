@@ -68,10 +68,15 @@ lasr_global* lasr_global_create(char const* key)
  * @param type The lasr type of the new value to be written; must be an atomic
  * type (not DYNAMIC.)
  */
-void export_atomic_global(lasr_global* container, int const value, int const type)
+void export_atomic_global(lasr_global* container, double const value, int const type)
 {
     int container_state;
     int container_type;
+
+    /* Lua values are doubles, but there exists no atomic_double type.
+     * Thus, these will be passed through integer values.
+     * `long long` is guaranteed to be at least 8 bytes. */
+    unsigned long long value_raw;
 
     if (type == LASR_TYPE_INVALID || type == LASR_TYPE_DYNAMIC) {
         LOG_DEBUG("Call to store non-atomic value as atomic");
@@ -81,19 +86,23 @@ void export_atomic_global(lasr_global* container, int const value, int const typ
     container_state = atomic_load(&container->state);
     container_type = atomic_load(&container->value.type);
 
-    /* Asserted by auto-splitter.c:update_shared_globals() (caller)
-     * PR TODO: Would this function be improved by making it a static symbol
-     * in autosplitter.c?
+    /* This should be asserted by caller, developer error if not.
+     * (caller is usually auto-splitter.c:update_shared_globals) */
     if (container_state == LASR_STATE_NEEDED || container_state == LASR_STATE_OWNED) {
-            return;
+        LOG_DEBUGF(
+            "Export container must be borrowed to be mutable:"
+            "assertion failure (tracked global `%s`)",
+            container->key);
+        return;
     }
-     */
+
+    memcpy(&value_raw, &value, sizeof(value_raw));
 
     switch (container_type) {
         case LASR_TYPE_NIL:
             if (type != LASR_TYPE_NIL) {
                 /* nil -> value: store value, then store type */
-                atomic_store(&container->value.atomic, value);
+                atomic_store(&container->value.atomic, value_raw);
                 atomic_store(&container->value.type, type);
             }
             /* (else) nil -> nil: do nothing */
@@ -102,7 +111,7 @@ void export_atomic_global(lasr_global* container, int const value, int const typ
         case LASR_TYPE_ATOMIC:
             if (type != LASR_TYPE_NIL) {
                 /* value -> value: store value */
-                atomic_store(&container->value.atomic, value);
+                atomic_store(&container->value.atomic, value_raw);
             } else {
                 /* value -> nil: store type only */
                 atomic_store(&container->value.type, type);
@@ -127,7 +136,7 @@ void export_atomic_global(lasr_global* container, int const value, int const typ
             atomic_store(&container->value.type, type);
 
             if (type != LASR_TYPE_NIL) {
-                atomic_store(&container->value.atomic, value);
+                atomic_store(&container->value.atomic, value_raw);
             } else {
                 /* Store a zero because the old data (a pointer) is certainly
                  * invalid. Note that BORROWED state is asserted here. */
@@ -217,6 +226,7 @@ int import_shared_global(lasr_global* container, lasr_export* target)
 
     int container_state;
     int container_type;
+    unsigned long long value_raw;
 
     if (!container) {
         return LASR_TYPE_INVALID;
@@ -262,7 +272,8 @@ int import_shared_global(lasr_global* container, lasr_export* target)
 
                     case LASR_TYPE_ATOMIC:
                         (void)lasr_export_resize(target, 0);
-                        target->fixed = atomic_load(&container->value.atomic);
+                        value_raw = atomic_load(&container->value.atomic);
+                        memcpy(&target->fixed, &value_raw, sizeof(target->fixed));
                         target->type = LASR_TYPE_ATOMIC;
                         break; /* nested switch */
                 }

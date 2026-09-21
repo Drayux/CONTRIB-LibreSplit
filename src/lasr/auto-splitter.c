@@ -243,10 +243,8 @@ static void pcall_fix_traceback(lua_State* L, const char* func)
 static void update_shared_globals(lua_State* L, lasr_global* head)
 {
     int lasr_type;
-    union {
-        int i;
-        char const* s;
-    } lua_value;
+    double number_value;
+    char const* str_value;
     size_t lstring_len;
     int container_state;
 
@@ -265,22 +263,15 @@ static void update_shared_globals(lua_State* L, lasr_global* head)
         switch (lua_type(L, -1)) { /* retrieve data type (of var at top of stack) */
             case LUA_TBOOLEAN:
             case LUA_TNUMBER:
-                /* NOTE: Floating types are not yet supported, but it could be
-                 * introduced here by checking the fractional part of the lua
-                 * variable. */
-                lua_value.i = lua_tointeger(L, -1);
+                number_value = lua_tonumber(L, -1);
                 lasr_type = LASR_TYPE_ATOMIC;
                 break;
 
             case LUA_TSTRING:
-                lua_value.s = lua_tolstring(L, -1, &lstring_len);
+                str_value = lua_tolstring(L, -1, &lstring_len);
                 lasr_type = LASR_TYPE_DYNAMIC;
                 break;
 
-            case LUA_TTABLE:
-                /* NOTE: No support for now, but there exists considerable
-                 * potential if this were to be converted into a JSON object.
-                 * However, doing so may be relatively costly. */
             default:
                 /* Treat other types as nil */
                 if (atomic_load(&head->value.type) != LASR_TYPE_NIL) {
@@ -293,9 +284,9 @@ static void update_shared_globals(lua_State* L, lasr_global* head)
         }
 
         if (lasr_type == LASR_TYPE_DYNAMIC) {
-            export_dynamic_global(head, lua_value.s, lstring_len);
+            export_dynamic_global(head, str_value, lstring_len);
         } else {
-            export_atomic_global(head, lua_value.i, lasr_type);
+            export_atomic_global(head, number_value, lasr_type);
         }
 
         lua_pop(L, 1);
