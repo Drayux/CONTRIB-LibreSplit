@@ -231,6 +231,24 @@ static void pcall_fix_traceback(lua_State* L, const char* func)
     lua_remove(L, -2); // remove original stacktrace string
 }
 
+/* Create an "empty" tail (TODO)
+ * The idea for this is roughly a way to register "as needed" but this still
+ * depends on the lua thread seeing this during a refresh loop and safely
+ * allocating a new tail.....which means we can't do mutiple at once.
+ *
+ * It's also then possible to register *before* init and mess up the tail that
+ * way...
+static void init_shared_globals(void)
+{
+        static lasr_global* tail = NULL;
+
+        if (!tail) {
+                // tail = calloc();
+        }
+}
+ *
+ */
+
 /**
  * Runs a sweep of all tracked shared globals for export.
  * When the data exchange state allows it, changes to the tracked value will

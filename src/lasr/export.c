@@ -336,6 +336,10 @@ size_t lasr_export_resize(lasr_export* value, size_t len)
 
 /**
  * Safely frees a 'lasr_global' container, including any nested allocations.
+ * This function should be called only if at least one of the following
+ * conditions is true:
+ * 1) Auto splitter is stopped
+ * 2) Called by a function in the auto splitter thread
  *
  * @param container A non-null reference to a 'lasr_global' container that will
  * be released.
@@ -348,5 +352,6 @@ void lasr_global_release(lasr_global* global)
         }
         lasr_export_resize((lasr_export*)&global->value, 0);
         /* do nothing with `next` to avoid risk of accidental double-free */
+        free(global);
     }
 }

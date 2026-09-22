@@ -41,18 +41,18 @@
  *
  * INVALID and NIL types mean that the associated data is meaningless. (NIL
  * indicates this is intentional, whereas INVALID arises when incomplete.)
- * ATOMIC means that the data fits into statically-allocated storage where
- * atomic CPU instructions are supported. DYNAMIC indicates that the data is a
- * heap-allocated array of a known length.
+ * A container may be set to the INVALID state if its owner wishes to drop its
+ * reference for memory release. ATOMIC means that the data fits into
+ * statically-allocated storage where atomic CPU instructions are supported.
+ * DYNAMIC indicates that the data is a heap-allocated array of a known length.
  *
  * Only DYNAMIC data types require a strict data exchange handoff (usage of the
  * OWNED / BORROWED states.)
  *
- * Implementation note:
- * I was originally planning more granular types such as floats or timestamps,
- * but this became the most effective implementation. Thus, it is (currently)
- * the responsibility of the component that needs the value to assume the data
- * format and perform conversions as necessary.
+ * Implementation Note: It is the responsibility of the component that needs
+ * the value to assume the data bit format and perform conversions as
+ * necessary. All atomic data is interpreted as a double from the Lua runtime
+ * and exchanged in a subsequent 8-byte value.
  */
 #define LASR_TYPE_INVALID 0 /* Corresponding data cannot be resolved and should be ignored */
 #define LASR_TYPE_NIL 1 /* There exists no data (null, none, nil, etc.) */
