@@ -260,7 +260,6 @@ static void init_shared_globals(void)
  */
 static void update_shared_globals(lua_State* L, lasr_global* head)
 {
-    int lasr_type;
     double number_value;
     char const* str_value;
     size_t lstring_len;
@@ -275,19 +274,19 @@ static void update_shared_globals(lua_State* L, lasr_global* head)
         }
 
         lua_getglobal(L, head->key); /* push var to stack */
-        lasr_type = LASR_TYPE_INVALID;
         lstring_len = 0;
 
         switch (lua_type(L, -1)) { /* retrieve data type (of var at top of stack) */
             case LUA_TBOOLEAN:
             case LUA_TNUMBER:
                 number_value = lua_tonumber(L, -1);
-                lasr_type = LASR_TYPE_ATOMIC;
+                export_atomic_global(head, number_value, LASR_TYPE_ATOMIC);
                 break;
 
             case LUA_TSTRING:
                 str_value = lua_tolstring(L, -1, &lstring_len);
-                lasr_type = LASR_TYPE_DYNAMIC;
+                // lasr_type = LASR_TYPE_DYNAMIC;
+                export_dynamic_global(head, str_value, lstring_len);
                 break;
 
             default:
@@ -297,14 +296,9 @@ static void update_shared_globals(lua_State* L, lasr_global* head)
                     LOG_DEBUGF("Unsupported type for lua export: `%s`", head->key);
                 }
             case LUA_TNIL:
-                lasr_type = LASR_TYPE_NIL;
+                number_value = 0.0f; // Not used if NIL type, suppress compiler warning
+                export_atomic_global(head, number_value, LASR_TYPE_NIL);
                 break;
-        }
-
-        if (lasr_type == LASR_TYPE_DYNAMIC) {
-            export_dynamic_global(head, str_value, lstring_len);
-        } else {
-            export_atomic_global(head, number_value, lasr_type);
         }
 
         lua_pop(L, 1);

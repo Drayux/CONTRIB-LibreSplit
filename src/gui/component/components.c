@@ -22,7 +22,7 @@ LSComponentAvailable ls_components[] = {
     // easier to leave this in place :)
     { "lua_title", ls_component_lua_title_new },
 
-    // { "splits", ls_component_splits_new },
+    { "splits", ls_component_splits_new },
     // { "timer", ls_component_timer_new },
     { "detailed-timer", ls_component_detailed_timer_new },
     { "prev-segment", ls_component_prev_segment_new },
