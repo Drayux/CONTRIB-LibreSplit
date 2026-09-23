@@ -43,7 +43,7 @@ lasr_global* lasr_global_create(char const* key)
         return NULL;
     }
 
-    atomic_store(&new->refcount, 1);
+    atomic_store(&new->held, false);
     atomic_store(&new->state, LASR_STATE_ATOMIC);
     value_.type = LASR_TYPE_NIL;
     value_.fixed = 0;
@@ -345,21 +345,20 @@ size_t lasr_export_resize(lasr_export* value, size_t len)
  */
 void lasr_global_release(lasr_global* global)
 {
-    int refcount;
+    int safe_to_free;
 
     if (!global) {
         return;
     }
 
-    refcount = atomic_fetch_add(&global->refcount, -1);
-    if (refcount > 1) { // fetch_add is post-incr, so local copy is offset by +1
-        return;
+    // atomic_fetch_and returns the value before the BITWISE AND op
+    safe_to_free = !(atomic_fetch_and(&global->held, 0));
+    if (safe_to_free) {
+        if (global->key) {
+            free((void*)global->key); /* strdup-ed on init */
+        }
+        lasr_export_resize((lasr_export*)&global->value, 0);
+        /* do nothing with `next` to avoid risk of accidental double-free */
+        free(global);
     }
-
-    if (global->key) {
-        free((void*)global->key); /* strdup-ed on init */
-    }
-    lasr_export_resize((lasr_export*)&global->value, 0);
-    /* do nothing with `next` to avoid risk of accidental double-free */
-    free(global);
 }

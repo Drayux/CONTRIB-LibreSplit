@@ -26,7 +26,7 @@ LSComponent* ls_component_lua_title_new(void)
 {
     LSLuaTitle* self;
 
-    self = malloc(sizeof(LSLuaTitle));
+    self = calloc(1, sizeof(LSLuaTitle));
     if (!self) {
         return NULL;
     }

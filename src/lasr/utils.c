@@ -49,7 +49,7 @@ void register_shared_global(lasr_global* new)
         return;
     }
 
-    (void)atomic_fetch_add(&new->refcount, 1);
+    atomic_store(&new->held, true);
     new->next = shared_globals;
     shared_globals = new;
 }
