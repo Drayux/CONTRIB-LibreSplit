@@ -127,7 +127,7 @@ static void lua_title_draw(LSComponent* self_, const ls_game* game, const ls_tim
         gtk_label_set_text(GTK_LABEL(self->title), title_.dynamic->bytes);
     } else if (type == LASR_TYPE_ATOMIC) {
         /* Numeric type */
-        snprintf(buf, sizeof(buf), "%lld", (long long)title_.fixed);
+        snprintf(buf, sizeof(buf), "%lf", (double)title_.fixed);
         gtk_label_set_text(GTK_LABEL(self->title), buf);
     }
 
