@@ -1,5 +1,6 @@
 #pragma once
 
+#include "src/lasr/settings.h"
 #include "src/settings/definitions.h"
 #include <jansson.h>
 #include <stdatomic.h>
@@ -9,6 +10,8 @@
 #define LS_INFO_LOSING_TIME (1 << 1)
 #define LS_INFO_BEST_SPLIT (1 << 2)
 #define LS_INFO_BEST_SEGMENT (1 << 3) // Gold split
+
+#define MAX_TIMESTAMP_LENGTH 256
 
 extern AppConfig cfg;
 
@@ -33,11 +36,22 @@ typedef enum ls_time_method {
     LS_GAME_TIME = 1, /*!< LS_GAME_TIME corresponds to ls_time.game_time */
 } ls_time_method;
 
+/**
+ * @brief The game struct representing a user's loaded splits file.
+ * When splits are saved, a snapshot of this struct is created for the
+ * save operation. So if this struct is modified, then the equivalent change
+ * must be added to the snapshot function in ./src/gui/game.c `create_snapshot`
+ * as well as any memory releasing in `ls_game_release`
+ */
 typedef struct ls_game {
     char path[PATH_MAX];
     char* title;
+    char* name;
+    char* category;
+    char* icon_path;
     char* theme;
     char* theme_variant;
+    char* auto_splitter_file;
     ls_time_method comparison_method;
     int attempt_count;
     int finished_count;
@@ -53,6 +67,11 @@ typedef struct ls_game {
     ls_time* segment_times;
     ls_time* best_splits;
     ls_time* best_segments;
+    atomic_bool has_unsaved_pb;
+    atomic_bool has_unsaved_gold;
+    atomic_bool has_unsaved_rainbow;
+    UserSetting** auto_splitter_settings;
+    size_t auto_splitter_settings_count;
 } ls_game;
 
 /**
@@ -81,6 +100,7 @@ typedef struct ls_timer {
     long long last_tick; // This NEEDS to be here for resetting
     int* attempt_count;
     int* finished_count;
+    char start_time[64];
 } ls_timer;
 
 extern atomic_bool run_started;
@@ -111,6 +131,8 @@ void ls_split_string(char* string, long long time, int compact);
 
 void ls_delta_string(char* string, long long time);
 
+void ls_game_user_settings_get(UserSetting*** settings, size_t* count);
+
 int ls_game_create(ls_game** game_ptr, const char* path, char** error_msg);
 
 void ls_game_update_splits(ls_game* game, const ls_timer* timer);
@@ -119,7 +141,13 @@ bool ls_timer_has_gold_split(const ls_timer* timer);
 
 bool ls_timer_has_rainbow_split(const ls_timer* timer);
 
+bool ls_game_has_achievement(const ls_timer* timer);
+
+bool ls_write_save(json_t* json, const char* path);
+
 int ls_game_save(const ls_game* game);
+
+void ls_game_saved(ls_game* game);
 
 void ls_game_release(ls_game* game);
 
@@ -145,8 +173,10 @@ void ls_timer_stop(ls_timer* timer);
 
 int ls_timer_reset(ls_timer* timer, ls_game* game);
 
-int ls_timer_cancel(ls_timer* timer);
+void ls_timer_cancel(ls_timer* timer);
 
 void json_time_get(const json_t* ref, ls_time* time);
 
 void json_time_set(json_t* ref, const ls_time* time);
+
+void ls_run_set_time(char* time_buf);

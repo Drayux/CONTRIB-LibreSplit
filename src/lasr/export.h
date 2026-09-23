@@ -78,7 +78,7 @@ typedef struct {
 typedef struct {
     atomic_int type; /*!< data type (LASR_TYPE_XXX) */
     union {
-        atomic_int atomic; /*!< accessor for fixed-length data */
+        atomic_ullong atomic; /*!< accessor for fixed-length data */
         lasr_dynamic_data const* const dynamic; /*!< accessor for variable-length data */
     };
 } lasr_value;
@@ -91,7 +91,7 @@ typedef struct {
 typedef struct {
     int type; /*!< data type (LASR_TYPE_XXX) */
     union {
-        int fixed; /*!< accessor for fixed-length data */
+        double fixed; /*!< accessor for fixed-length data */
         lasr_dynamic_data* dynamic; /*!< accessor for variable-length data */
     };
 } lasr_export;
