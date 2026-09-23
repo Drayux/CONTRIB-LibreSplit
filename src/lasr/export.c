@@ -43,6 +43,7 @@ lasr_global* lasr_global_create(char const* key)
         return NULL;
     }
 
+    atomic_store(&new->refcount, 1);
     atomic_store(&new->state, LASR_STATE_ATOMIC);
     value_.type = LASR_TYPE_NIL;
     value_.fixed = 0;
@@ -336,22 +337,29 @@ size_t lasr_export_resize(lasr_export* value, size_t len)
 
 /**
  * Safely frees a 'lasr_global' container, including any nested allocations.
- * This function should be called only if at least one of the following
- * conditions is true:
- * 1) Auto splitter is stopped
- * 2) Called by a function in the auto splitter thread
+ * As this type is shared between two threads, a simple reference counter is
+ * used.
  *
  * @param container A non-null reference to a 'lasr_global' container that will
  * be released.
  */
 void lasr_global_release(lasr_global* global)
 {
-    if (global) {
-        if (global->key) {
-            free((void*)global->key); /* strdup-ed on init */
-        }
-        lasr_export_resize((lasr_export*)&global->value, 0);
-        /* do nothing with `next` to avoid risk of accidental double-free */
-        free(global);
+    int refcount;
+
+    if (!global) {
+        return;
     }
+
+    refcount = atomic_fetch_add(&global->refcount, -1);
+    if (refcount > 1) { // fetch_add is post-incr, so local copy is offset by +1
+        return;
+    }
+
+    if (global->key) {
+        free((void*)global->key); /* strdup-ed on init */
+    }
+    lasr_export_resize((lasr_export*)&global->value, 0);
+    /* do nothing with `next` to avoid risk of accidental double-free */
+    free(global);
 }

@@ -113,6 +113,7 @@ struct _lasr_global {
     char const* key; /*!< name of tracked lua variable */
     lasr_global* next; /*!< next tracked value in sequence */
     atomic_int state; /*!< data exchange state */
+    atomic_int refcount; /*!< reference counter for cleanup */
     lasr_value value; /*!< exported value */
 };
 
