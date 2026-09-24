@@ -1186,6 +1186,7 @@ int ls_game_save(const ls_game* game)
 	json_t ** component_config;
     if (game->title) {
         json_object_set_new(json, "title", json_string(game->title));
+	}
     if (game->name) {
         json_object_set_new(json, "name", json_string(game->name));
     }
