@@ -138,6 +138,9 @@ LSAppWindow* ls_app_window_get_default(LSApp* app)
  */
 static void ls_app_window_destroy_components(LSAppWindow* win)
 {
+	GtkWidget* w;
+	GList* l;
+
 	if (!win || !win->components) {
 		return;
 	}
@@ -145,10 +148,8 @@ static void ls_app_window_destroy_components(LSAppWindow* win)
     LOG_DEBUG("Destroying components...");
 
 	/* Remove all widgets in the widget box */
-	GList* l = gtk_container_get_children(GTK_CONTAINER(win->box));
-	for (; l != NULL; l = l->next) {
-		GtkWidget* w = GTK_WIDGET(l->data);
-		gtk_container_remove(GTK_CONTAINER(win->box), w);
+	while ((w = gtk_widget_get_first_child(GTK_WIDGET(win->box)))) {
+		gtk_box_remove(GTK_BOX(win->box), w);
 	}
 
 	/* Call the delete method for all tracked components.
@@ -203,7 +204,7 @@ static void ls_app_window_default_components(LSAppWindow* win)
             if (widget) {
                 gtk_widget_set_margin_start(widget, WINDOW_PAD);
                 gtk_widget_set_margin_end(widget, WINDOW_PAD);
-                gtk_container_add(GTK_CONTAINER(win->box),
+                gtk_box_append(GTK_BOX(win->box),
                     component->ops->widget(component));
             }
             win->components = g_list_append(win->components, component);
@@ -296,6 +297,7 @@ static bool ls_app_window_add_components(LSAppWindow* win)
 		}
 
 		if (component_ref) {
+			// TODO: I wrote this comment and even I don't know what it means
 			/* We don't use ref in the init call, but it's non-null if the
 			 * configuration is a JSON object */
 			component = component_init->new(*component_config);
@@ -310,7 +312,7 @@ static bool ls_app_window_add_components(LSAppWindow* win)
             if (widget) {
                 gtk_widget_set_margin_start(widget, WINDOW_PAD);
                 gtk_widget_set_margin_end(widget, WINDOW_PAD);
-                gtk_container_add(GTK_CONTAINER(win->box), widget);
+                gtk_box_append(GTK_BOX(win->box), widget);
             }
             win->components = g_list_prepend(win->components, component);
 			LOG_DEBUGF("Registered component `%s`", component_name);
@@ -380,22 +382,10 @@ void ls_app_window_open(LSAppWindow* win, const char* file)
 		 * Extra credit: maybe give options for "skip" or "use defaults."
 		 * Though, this has further implications on what to save back to the
 		 * splits file. */
-
-        // ^^ I've rebased against changes that add a helper function for this
-        // as well, so I should also include that.
-
-		error_popup = gtk_message_dialog_new(
-			GTK_WINDOW(win),
-			GTK_DIALOG_DESTROY_WITH_PARENT,
-			GTK_MESSAGE_INFO,
-			GTK_BUTTONS_OK,
-			"A component has been skipped because it failed to load.\n"
-			"Check the spelling in the selected splits file:\n%s",
+		ls_alert_error(GTK_WINDOW(win), "LibreSplit",
+			"A component has been skipped because it failed to load.\n" \
+			"Check the spelling in the selected splits file:",
 			file);
-		gtk_dialog_run(GTK_DIALOG(error_popup));
-
-		free(error_msg);
-		gtk_widget_destroy(error_popup);
 
 		/* Pending the above TODO, for now, this branch will always show the
 		 * game, but with bad component configs skipped. */
@@ -907,10 +897,6 @@ static void ls_app_window_init(LSAppWindow* win)
     gtk_widget_set_margin_bottom(win->box, 0);
     gtk_widget_set_vexpand(win->box, TRUE);
     gtk_box_append(GTK_BOX(win->container), win->box);
-
-
-	// (TODO*) NOTE: Moved the add component logic to the "add_components" subroutine (in game.c)
-	// ls_app_window_add_components(win); // Moved this to window_open
 
     // NOTE: This always creates an empty footer, no matter how many
     //  ^ "footers" are available, which may give issues with theming
