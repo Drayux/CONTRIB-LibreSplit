@@ -754,7 +754,6 @@ int ls_game_create(ls_game** game_ptr, const char* path, char** error_msg)
 		 * If the asserted conditions are not met, then it is not supported to
 		 * load and subsequently save without losing the original, albeit
 		 * invalid, splits file. Futher errors can be handled gracefully. */
-		int num_components = 0;
 		json_t* component_cfg;
 		for (size_t i = 0; i < json_array_size(ref); ++i) {
 			component_cfg = json_array_get(ref, i);
@@ -769,7 +768,8 @@ int ls_game_create(ls_game** game_ptr, const char* path, char** error_msg)
 			}
 
 			/* Each component validates its own sub-config. */
-			game->component_config[num_components++] = component_cfg;
+			game->component_config[game->component_config_count] = component_cfg;
+            game->component_config_count += 1;
 			json_incref(component_cfg); // held for lifetime of ls_game
 		}
 	}

@@ -14,6 +14,28 @@
 #include <string.h>
 
 /**
+ * Helper function to verify the format of an export key.
+ *
+ * Lua export values should be initialized with the format `:tracked_variable`
+ * to differentiate between a dynamic and static value (i.e. a title variable
+ * or the literal string "title".)
+ *
+ * @param key Complete C-string of the Lua variable to track
+ *
+ * @return A pointer to the beginning of the variable name (aka key[1]) if
+ * the key is valid, else NULL. No memory is be allocated.
+ */
+char const* lasr_global_check_key(char const* key)
+{
+    if (key) {
+        if (key[0] == ':' && strlen(key) >= 2) {
+            return &key[1];
+        }
+    }
+    return NULL;
+}
+
+/**
  * Allocates and initializes a new `lasr_global` type for data shared between
  * a reading and writing thread.
  *
@@ -28,6 +50,7 @@ lasr_global* lasr_global_create(char const* key)
     lasr_global* new;
     lasr_export value_;
 
+    key = lasr_global_check_key(key);
     if (!key) {
         return NULL;
     }
@@ -229,9 +252,11 @@ int import_shared_global(lasr_global* container, lasr_export* target)
     int container_type;
     unsigned long long value_raw;
 
-    if (!container) {
+    if (!container || !target) {
         return LASR_TYPE_INVALID;
     }
+
+    memset(target, 0, sizeof(lasr_export));
 
     container_type = atomic_load(&container->value.type);
     container_state = atomic_load(&container->state);
@@ -351,12 +376,16 @@ void lasr_global_release(lasr_global* global)
         return;
     }
 
-    // atomic_fetch_and returns the value before the BITWISE AND op
+    // atomic_fetch_and returns the value before the BITWISE AND operation
     safe_to_free = !(atomic_fetch_and(&global->held, 0));
     if (safe_to_free) {
         if (global->key) {
+            LOG_DEBUGF("Release export var `%s`", global->key);
             free((void*)global->key); /* strdup-ed on init */
+        } else {
+            LOG_WARN("Release export var (NULL key)"); // developer error
         }
+
         lasr_export_resize((lasr_export*)&global->value, 0);
         /* do nothing with `next` to avoid risk of accidental double-free */
         free(global);

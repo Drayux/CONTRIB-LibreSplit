@@ -36,6 +36,7 @@ typedef struct save_data {
  */
 static ls_game* create_snapshot(const ls_game* game)
 {
+    unsigned int i;
     ls_game* snapshot = calloc(1, sizeof(ls_game));
     if (!snapshot) {
         LOG_ERR("snapshot creation: unable to allocate memory for `ls_game`")
@@ -92,6 +93,39 @@ static ls_game* create_snapshot(const ls_game* game)
             goto create_snapshot_failed;
         }
     }
+
+
+    /* TODO / NOTE: These structs are shallow copied!
+     * 
+     * This mostly temporary so that my new config saves back to the splits
+     * file while I'm implementing it. Assumed safe because this data JSON is
+     * assumed constant.
+     *
+     * Big picture, the best solution I believe would be to revise the
+     * structures that compose our timer/game/settings/etc.
+     *
+     * Static info per game instance (like the configs, run name, etc.) could
+     * be saved in one place, and then an array of splits "a run" could be its
+     * own, both referenced by the "aggregate game type." More on this
+     * elsewhere, but TLDR make a "sharable file" and then a "user settings
+     * file" and finally a "user run data file / folder"
+     */
+    if (game->component_config && (game->component_config_count > 0)) {
+        snapshot->component_config = calloc(game->component_config_count + 1, sizeof(json_t*));
+        if (!snapshot->component_config) {
+            LOG_ERR("snapshot creation: unable to duplicate `component_config` in memory");
+            goto create_snapshot_failed;
+        }
+
+        snapshot->component_config_count = game->component_config_count;
+        for (i = 0; i < game->component_config_count; ++i) {
+            json_t* ref = game->component_config[i];
+            snapshot->component_config[i] = ref;
+            json_incref(ref);
+        }
+    }
+    /* *** */
+
 
     if (game->auto_splitter_file) {
         snapshot->auto_splitter_file = strdup(game->auto_splitter_file);

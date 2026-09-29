@@ -4,6 +4,10 @@
  */
 #include "components.h"
 
+#include "../../lasr/export.h"
+#include "../../lasr/utils.h"
+#include "../../logging.h"
+
 /**
  * @brief The component representing the title.
  *
@@ -13,8 +17,8 @@ typedef struct LSTitle {
     LSComponent base; /*!< The base struct that is extended */
     GtkWidget* header; /*!< The container for the title */
     GtkWidget* title; /*!< The label containing the title itself */
-    GtkWidget* attempt_count; /*!< The label containing the number of attempts. */
-    GtkWidget* finished_count; /*<! The label containing the number of finished runs. */
+    lasr_global* title_content; /*<! Lua export container for dynamic title */
+    GtkWidget* attempts; /*!< The label containing the number of attempts. */
 } LSTitle;
 extern LSComponentOps ls_title_operations; // defined at the end of the file
 
@@ -26,11 +30,30 @@ LSComponent* ls_component_title_new(json_t* config)
     LSTitle* self;
     GtkWidget* counts;
 
-    self = malloc(sizeof(LSTitle));
+    char const* config_source = NULL;
+    bool config_simple = false;
+
+    self = calloc(1, sizeof(LSTitle));
     if (!self) {
         return NULL;
     }
     self->base.ops = &ls_title_operations;
+
+    /* Configuration option: `simple`
+	 * default: false
+	 * If true, only show the title, not the finished/attempts count. */
+	config_simple = json_is_true(json_object_get(config, "simple"));
+    
+	/* Configuration option: `source`
+	 * default: none
+	 * If provided, the corresponding :luavar will be tracked. Whenever this is
+	 * is a string of non-zero length, it will be displayed in place of the
+	 * title. */
+	config_source = json_string_value(json_object_get(config, "source"));
+	if (config_source != NULL) {
+        self->title_content = lasr_global_create(config_source);
+        register_shared_global(self->title_content);
+	}
 
     self->header = gtk_center_box_new();
     gtk_center_box_set_shrink_center_last(GTK_CENTER_BOX(self->header), FALSE);
@@ -43,21 +66,17 @@ LSComponent* ls_component_title_new(json_t* config)
     gtk_widget_set_hexpand(self->title, TRUE);
     gtk_center_box_set_center_widget(GTK_CENTER_BOX(self->header), self->title);
 
-    counts = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+    if (!config_simple) {
+        counts = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
 
-    self->attempt_count = gtk_label_new(NULL);
-    add_class(self->attempt_count, "attempt-count");
-    gtk_widget_set_margin_start(self->attempt_count, 8);
-    gtk_widget_set_valign(self->attempt_count, GTK_ALIGN_START);
-    gtk_box_append(GTK_BOX(counts), self->attempt_count);
+        self->attempts = gtk_label_new(NULL);
+        add_class(self->attempts, "attempt-count");
+        gtk_widget_set_margin_start(self->attempts, 8);
+        gtk_widget_set_valign(self->attempts, GTK_ALIGN_START);
+        gtk_box_append(GTK_BOX(counts), self->attempts);
 
-    self->finished_count = gtk_label_new(NULL);
-    add_class(self->finished_count, "finished_count");
-    gtk_widget_set_margin_start(self->finished_count, 8);
-    gtk_widget_set_valign(self->finished_count, GTK_ALIGN_START);
-    gtk_box_append(GTK_BOX(counts), self->finished_count);
-
-    gtk_center_box_set_end_widget(GTK_CENTER_BOX(self->header), counts);
+        gtk_center_box_set_end_widget(GTK_CENTER_BOX(self->header), counts);
+    }
 
     return (LSComponent*)self;
 }
@@ -67,8 +86,10 @@ LSComponent* ls_component_title_new(json_t* config)
  *
  * @param self The component to destroy
  */
-static void title_delete(LSComponent* self)
+static void title_delete(LSComponent* self_)
 {
+    LSTitle* self = (LSTitle*)self_;
+    lasr_global_release(self->title_content);
     free(self);
 }
 
@@ -93,11 +114,11 @@ static GtkWidget* title_widget(LSComponent* self)
 static void title_show_game(LSComponent* self_, const ls_game* game,
     const ls_timer* timer)
 {
-    char str[64];
     LSTitle* self = (LSTitle*)self_;
+
+    /* Always start with game title -- User might only update this with a lua
+     * var mid-run */
     gtk_label_set_text(GTK_LABEL(self->title), game->title);
-    sprintf(str, "#%d", game->attempt_count);
-    gtk_label_set_text(GTK_LABEL(self->attempt_count), str);
 }
 
 /**
@@ -109,16 +130,29 @@ static void title_show_game(LSComponent* self_, const ls_game* game,
  */
 static void title_draw(LSComponent* self_, const ls_game* game, const ls_timer* timer)
 {
-    char attempt_str[64];
-    char finished_str[64];
-    char combi_str[64];
+    char buf[64];
+    lasr_export title_export;
+    int title_type;
     LSTitle* self = (LSTitle*)self_;
-    sprintf(attempt_str, "%d", game->attempt_count);
-    sprintf(finished_str, "#%d", game->finished_count);
-    strcpy(combi_str, finished_str);
-    strcat(combi_str, "/");
-    strcat(combi_str, attempt_str);
-    gtk_label_set_text(GTK_LABEL(self->attempt_count), combi_str);
+
+    if (self->attempts) {
+        snprintf(buf, sizeof(buf), "#%d/#%d",
+            game->finished_count,
+            game->attempt_count);
+        gtk_label_set_text(GTK_LABEL(self->attempts), buf);
+    }
+    
+    title_type = import_shared_global(self->title_content, &title_export);
+    if (title_type == LASR_TYPE_DYNAMIC) {
+        gtk_label_set_text(GTK_LABEL(self->title), title_export.dynamic->bytes);
+    } else if (title_type == LASR_TYPE_ATOMIC) {
+        /* Numeric type */
+        snprintf(buf, sizeof(buf), "%.2lf", title_export.fixed);
+        gtk_label_set_text(GTK_LABEL(self->title), buf);
+    }
+
+    /* Cleanup -- no memory was allocated if string not changed */
+    lasr_export_resize(&title_export, 0);
 }
 
 LSComponentOps ls_title_operations = {

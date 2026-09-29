@@ -1,4 +1,6 @@
 #include "utils.h"
+
+#include "../logging.h"
 #include "../gui/dialogs.h"
 #include "./auto-splitter.h"
 #include "./maps/maps.h"
@@ -29,26 +31,31 @@ bool restart_auto_splitter(void)
  * runtime itself. Omitting this call, the value will remain unchanged
  * regardless of the lua state.
  *
- * NOTE: This cannot be called by the main thread and thus, cannot be safely called
- * while the splitter is running.
+ * NOTE: This cannot be called by the main thread and thus, cannot be safely
+ * called while the splitter is running.
  *
  * @param container A non-null reference to a 'lasr_global' container to be
  * tracked.
  */
 void register_shared_global(lasr_global* new)
 {
-    if (!new || atomic_load(&auto_splitter_running)) {
+    if (atomic_load(&auto_splitter_running)) {
         /* Reject this call if the autosplitter is running (developer error if
          * this happens.)
          * The linked list is not atomic, so we are certain to spontaneously
          * crash if this were ignored */
-        printf("Reject registration of export var `%s`\n", new ? new->key : "<none>");
+        LOG_DEBUGF("Reject registration of export var `%s`", new ? new->key : "<none>");
+        return;
+    } else if (!new) {
+        /* Valid flow, nothing to do. */
         return;
     }
 
     atomic_store(&new->held, true);
     new->next = shared_globals;
     shared_globals = new;
+    
+    LOG_DEBUGF("Register export var `%s`", new ? new->key : "<none>");
 }
 
 /**
