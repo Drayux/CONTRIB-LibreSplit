@@ -1,7 +1,7 @@
 #include "utils.h"
 
-#include "../logging.h"
 #include "../gui/dialogs.h"
+#include "../logging.h"
 #include "./auto-splitter.h"
 #include "./maps/maps.h"
 
@@ -54,7 +54,7 @@ void register_shared_global(lasr_global* new)
     atomic_store(&new->held, true);
     new->next = shared_globals;
     shared_globals = new;
-    
+
     LOG_DEBUGF("Register export var `%s`", new ? new->key : "<none>");
 }
 

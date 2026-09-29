@@ -40,8 +40,8 @@ typedef struct LSComponentAvailable {
 } LSComponentAvailable;
 
 // A NULL-terminated array of all available components
-extern LSComponentAvailable const ls_components[];
+extern const LSComponentAvailable ls_components[];
 
-LSComponentAvailable const * get_component(char const * const name);
+const LSComponentAvailable* get_component(const char* const name);
 
 #endif /* __COMPONENTS_H__ */

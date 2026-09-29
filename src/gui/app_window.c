@@ -138,34 +138,34 @@ LSAppWindow* ls_app_window_get_default(LSApp* app)
  */
 static void ls_app_window_destroy_components(LSAppWindow* win)
 {
-	GtkWidget* w;
-	GList* l;
+    GtkWidget* w;
+    GList* l;
 
-	if (!win || !win->components) {
-		return;
-	}
+    if (!win || !win->components) {
+        return;
+    }
 
     LOG_DEBUG("Destroying components...");
 
-	/* Remove all widgets in the widget box */
-	while ((w = gtk_widget_get_first_child(GTK_WIDGET(win->box)))) {
-		gtk_box_remove(GTK_BOX(win->box), w);
-	}
-
-	/* Call the delete method for all tracked components.
-	 * NOTE: The refcount of the component's corresponding GtkWidget(s) is
-	 * dropped to 0 when the container is removed above. Thus, the delete
-	 * logic need not destroy these. */
-	for (l = win->components; l != NULL; l = l->next) {
-        LSComponent* c = l->data;
-		if (c && c->ops->delete) {
-			c->ops->delete(c);
-		} else {
-			LOG_DEBUG("Skipped release of component with no delete method.");
-		}
+    /* Remove all widgets in the widget box */
+    while ((w = gtk_widget_get_first_child(GTK_WIDGET(win->box)))) {
+        gtk_box_remove(GTK_BOX(win->box), w);
     }
 
-	g_list_free(win->components);
+    /* Call the delete method for all tracked components.
+     * NOTE: The refcount of the component's corresponding GtkWidget(s) is
+     * dropped to 0 when the container is removed above. Thus, the delete
+     * logic need not destroy these. */
+    for (l = win->components; l != NULL; l = l->next) {
+        LSComponent* c = l->data;
+        if (c && c->ops->delete) {
+            c->ops->delete(c);
+        } else {
+            LOG_DEBUG("Skipped release of component with no delete method.");
+        }
+    }
+
+    g_list_free(win->components);
     win->components = NULL;
 }
 
@@ -182,23 +182,23 @@ static void ls_app_window_default_components(LSAppWindow* win)
 {
     LOG_DEBUG("Creating default components...");
 
-	// TODO: better defaults, just proof of concept right now
-	// ^^ Maybe better to make this static so we don't keep searching for it?
-	LSComponentAvailable const * default_components[] = {
-		get_component("title"),
-		get_component("splits"),
-		get_component("timer"),
-		/* --- */
-		NULL
-	};
+    // TODO: better defaults, just proof of concept right now
+    // ^^ Maybe better to make this static so we don't keep searching for it?
+    const LSComponentAvailable* default_components[] = {
+        get_component("title"),
+        get_component("splits"),
+        get_component("timer"),
+        /* --- */
+        NULL
+    };
 
-	LSComponentAvailable const ** component_init;
-	LSComponent* component;
-	GtkWidget* widget;
+    const LSComponentAvailable** component_init;
+    LSComponent* component;
+    GtkWidget* widget;
 
-	component_init = &default_components[0];
+    component_init = &default_components[0];
 
-	while (*component_init) {
+    while (*component_init) {
         if ((component = (*component_init)->new(NULL))) {
             widget = component->ops->widget(component);
             if (widget) {
@@ -209,8 +209,8 @@ static void ls_app_window_default_components(LSAppWindow* win)
             }
             win->components = g_list_append(win->components, component);
         }
-		++component_init;
-	}
+        ++component_init;
+    }
 }
 
 /**
@@ -229,83 +229,83 @@ static void ls_app_window_default_components(LSAppWindow* win)
  */
 static bool ls_app_window_add_components(LSAppWindow* win)
 {
-	json_t ** component_config; /* List of pointers (json objects) */
-	json_t * component_ref;
-	char const * component_name;
-	LSComponentAvailable const * component_init;
-	LSComponent* component;
-	GtkWidget* widget;
-	bool bad_config = false; /* Retval -- true when a component was skipped. */
+    json_t** component_config; /* List of pointers (json objects) */
+    json_t* component_ref;
+    const char* component_name;
+    const LSComponentAvailable* component_init;
+    LSComponent* component;
+    GtkWidget* widget;
+    bool bad_config = false; /* Retval -- true when a component was skipped. */
 
-	ls_app_window_destroy_components(win);
+    ls_app_window_destroy_components(win);
 
-	if (win->game->component_config) {
-		component_config = &win->game->component_config[0];
-	} else {
-		/* No component config was given, use defaults! */
-		ls_app_window_default_components(win);
-		return false;
-	}
+    if (win->game->component_config) {
+        component_config = &win->game->component_config[0];
+    } else {
+        /* No component config was given, use defaults! */
+        ls_app_window_default_components(win);
+        return false;
+    }
 
     LOG_DEBUG("Creating components from split file...");
 
-	while (*component_config) {
-		if (json_is_string(*component_config)) {
-			/* "components": [
-			 *     { ... }, // other component
-			 *
-			 *     "this_component",
-			 *
-			 *     { ... }, // other component
-			 * ]
-			 *
-			 * ^^ Use default options for this component */
-			component_ref = NULL;
-			component_name = json_string_value(*component_config);
-		} else {
-			/* "components": [
-			 *     { ... }, // other component
-			 *
-			 *     {
-			 *         "component": "this_component",
-			 *         "option_one": "some_value",
-			 *         "option_two": "other_value",
-			 *         // ...
-			 *     },
-			 *
-			 *     { ... }, // other component
-			 * ]
-			 *
-			 * ^^ Use user-configured options for this component */
-			component_ref = json_object_get(*component_config, "component");
-			component_name = json_string_value(component_ref);
-		}
+    while (*component_config) {
+        if (json_is_string(*component_config)) {
+            /* "components": [
+             *     { ... }, // other component
+             *
+             *     "this_component",
+             *
+             *     { ... }, // other component
+             * ]
+             *
+             * ^^ Use default options for this component */
+            component_ref = NULL;
+            component_name = json_string_value(*component_config);
+        } else {
+            /* "components": [
+             *     { ... }, // other component
+             *
+             *     {
+             *         "component": "this_component",
+             *         "option_one": "some_value",
+             *         "option_two": "other_value",
+             *         // ...
+             *     },
+             *
+             *     { ... }, // other component
+             * ]
+             *
+             * ^^ Use user-configured options for this component */
+            component_ref = json_object_get(*component_config, "component");
+            component_name = json_string_value(component_ref);
+        }
 
-		if (!component_name) {
-			/* This case should not occur; developer error if it does */
-			LOG_DEBUG("Unnamed component config");
-			bad_config = true;
-			++component_config;
-			continue;
-		} else if (!(component_init = get_component(component_name))) {
-			/* Occurs when the component name isn't matched.
-			 * I.E., user specifies `"components": [ "taimer" ]` */
-			LOG_WARNF("Unrecognized component `%s`", component_name);
-			bad_config = true;
-			++component_config;
-			continue;
-		}
+        if (!component_name) {
+            /* This case should not occur; developer error if it does */
+            LOG_DEBUG("Unnamed component config");
+            bad_config = true;
+            ++component_config;
+            continue;
+        } else if (!(component_init = get_component(component_name))) {
+            /* Occurs when the component name isn't matched.
+             * I.E., user specifies `"components": [ "taimer" ]` */
+            LOG_WARNF("Unrecognized component `%s`", component_name);
+            bad_config = true;
+            ++component_config;
+            continue;
+        }
 
-		if (component_ref) {
-			// TODO: I wrote this comment and even I don't know what it means
-			/* We don't use ref in the init call, but it's non-null if the
-			 * configuration is a JSON object */
-			component = component_init->new(*component_config);
-		} else {
-			/* ^^ otherwise it was a string, so use default options (by setting
-			 * the json object pointer to NULL.) */
-			component = component_init->new(NULL);
-		}
+        if (component_ref) {
+            // TODO: I wrote this comment and even I don't know what it means
+            /* We don't use ref in the init call, but it's non-null if the
+             * configuration is a JSON object */
+            component = component_init->new(*component_config);
+        } else {
+            /* ^^ otherwise it was a string, so use default options (by setting
+             * the json object pointer to NULL.) */
+            component = component_init->new(NULL);
+        }
 
         if (component) {
             widget = component->ops->widget(component);
@@ -315,16 +315,16 @@ static bool ls_app_window_add_components(LSAppWindow* win)
                 gtk_box_append(GTK_BOX(win->box), widget);
             }
             win->components = g_list_prepend(win->components, component);
-			LOG_DEBUGF("Registered component `%s`", component_name);
+            LOG_DEBUGF("Registered component `%s`", component_name);
         } else {
-			LOG_DEBUGF("Failed to create component `%s`", component_name);
-			bad_config = true;
-		}
+            LOG_DEBUGF("Failed to create component `%s`", component_name);
+            bad_config = true;
+        }
 
-		++component_config; // Points to next component configuration (json object)
+        ++component_config; // Points to next component configuration (json object)
     }
 
-	return bad_config;
+    return bad_config;
 }
 
 /**
@@ -374,21 +374,21 @@ void ls_app_window_open(LSAppWindow* win, const char* file)
         win->timer = 0;
     } else if (ls_runs_create(&win->runs)) {
         win->runs = 0;
-	} else if (ls_app_window_add_components(win)) {
-		
-		/* TODO: Probably outside the scope of these changes, this popup could
-		 * stand to be more helpful.
-		 *
-		 * Extra credit: maybe give options for "skip" or "use defaults."
-		 * Though, this has further implications on what to save back to the
-		 * splits file. */
-		ls_alert_error(GTK_WINDOW(win), "LibreSplit",
-			"A component has been skipped because it failed to load.\n" \
-			"Check the spelling in the selected splits file:",
-			file);
+    } else if (ls_app_window_add_components(win)) {
 
-		/* Pending the above TODO, for now, this branch will always show the
-		 * game, but with bad component configs skipped. */
+        /* TODO: Probably outside the scope of these changes, this popup could
+         * stand to be more helpful.
+         *
+         * Extra credit: maybe give options for "skip" or "use defaults."
+         * Though, this has further implications on what to save back to the
+         * splits file. */
+        ls_alert_error(GTK_WINDOW(win), "LibreSplit",
+            "A component has been skipped because it failed to load.\n"
+            "Check the spelling in the selected splits file:",
+            file);
+
+        /* Pending the above TODO, for now, this branch will always show the
+         * game, but with bad component configs skipped. */
 
         // TODO: Duplicated code for the rebase
         if (win->game->auto_splitter_file && win->game->auto_splitter_file[0] != '\0') {
@@ -402,7 +402,7 @@ void ls_app_window_open(LSAppWindow* win, const char* file)
         }
         atomic_store(&auto_splitter_enabled, cfg.libresplit.auto_splitter_enabled.value.b);
         ls_app_window_show_game(win);
-		return; // success*!
+        return; // success*!
     } else {
         // TODO: Duplicated code for the rebase
         if (win->game->auto_splitter_file && win->game->auto_splitter_file[0] != '\0') {
@@ -416,12 +416,12 @@ void ls_app_window_open(LSAppWindow* win, const char* file)
         }
         atomic_store(&auto_splitter_enabled, cfg.libresplit.auto_splitter_enabled.value.b);
         ls_app_window_show_game(win);
-		return; // success!
-	}
+        return; // success!
+    }
 
-	/* If the window failed to open, show the "empty" window (with the welcome
-	 * box visible) instead. */
-	ls_app_window_clear_game(win);
+    /* If the window failed to open, show the "empty" window (with the welcome
+     * box visible) instead. */
+    ls_app_window_clear_game(win);
 }
 
 void ls_app_startup(GApplication* app)
@@ -660,7 +660,7 @@ void ls_app_window_destroy(GtkWidget* widget, gpointer data)
     atomic_store(&auto_splitter_enabled, 0);
     atomic_store(&exit_requested, 1);
 
-	ls_app_window_destroy_components(win);
+    ls_app_window_destroy_components(win);
 
     LOG_DEBUG("Exit request sent to threads");
     if (win->context_menu) {

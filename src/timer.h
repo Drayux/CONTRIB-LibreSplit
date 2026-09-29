@@ -73,8 +73,8 @@ typedef struct ls_game {
     atomic_bool has_unsaved_rainbow;
     UserSetting** auto_splitter_settings;
     size_t auto_splitter_settings_count;
-	json_t** component_config; // NULL-terminated list of components
-	size_t component_config_count;
+    json_t** component_config; // NULL-terminated list of components
+    size_t component_config_count;
 } ls_game;
 
 /**

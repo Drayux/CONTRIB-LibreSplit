@@ -94,9 +94,8 @@ static ls_game* create_snapshot(const ls_game* game)
         }
     }
 
-
     /* TODO / NOTE: These structs are shallow copied!
-     * 
+     *
      * This mostly temporary so that my new config saves back to the splits
      * file while I'm implementing it. Assumed safe because this data JSON is
      * assumed constant.
@@ -125,7 +124,6 @@ static ls_game* create_snapshot(const ls_game* game)
         }
     }
     /* *** */
-
 
     if (game->auto_splitter_file) {
         snapshot->auto_splitter_file = strdup(game->auto_splitter_file);

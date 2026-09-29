@@ -14,7 +14,7 @@ LSComponent* ls_component_splits_new(json_t* config);
 LSComponent* ls_component_title_new(json_t* config);
 LSComponent* ls_component_wr_new(json_t* config);
 
-LSComponentAvailable const ls_components[] = {
+const LSComponentAvailable ls_components[] = {
     { "title", ls_component_title_new },
 
     // Temporary proof-of-concept component! Future PRs will make this obsolete
@@ -38,18 +38,19 @@ LSComponentAvailable const ls_components[] = {
  * @return Returns a reference to the component via the LSComponentAvailable
  * struct if found, NULL otherwise
  */
-LSComponentAvailable const * get_component(char const * const name) {
-	LSComponentAvailable const * ref = &ls_components[0];
+const LSComponentAvailable* get_component(const char* const name)
+{
+    const LSComponentAvailable* ref = &ls_components[0];
 
-	if (!name) {
-		return NULL;
-	}
+    if (!name) {
+        return NULL;
+    }
 
-	while (ref->name) {
-		if (!strcmp(ref->name, name)) {
-			return ref;
-		}
-		++ref;
-	}
-	return NULL;
+    while (ref->name) {
+        if (!strcmp(ref->name, name)) {
+            return ref;
+        }
+        ++ref;
+    }
+    return NULL;
 }

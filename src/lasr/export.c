@@ -25,7 +25,7 @@
  * @return A pointer to the beginning of the variable name (aka key[1]) if
  * the key is valid, else NULL. No memory is be allocated.
  */
-char const* lasr_global_check_key(char const* key)
+const char* lasr_global_check_key(const char* key)
 {
     if (key) {
         if (key[0] == ':' && strlen(key) >= 2) {

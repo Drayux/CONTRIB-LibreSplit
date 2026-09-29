@@ -30,7 +30,7 @@ LSComponent* ls_component_title_new(json_t* config)
     LSTitle* self;
     GtkWidget* counts;
 
-    char const* config_source = NULL;
+    const char* config_source = NULL;
     bool config_simple = false;
 
     self = calloc(1, sizeof(LSTitle));
@@ -40,20 +40,20 @@ LSComponent* ls_component_title_new(json_t* config)
     self->base.ops = &ls_title_operations;
 
     /* Configuration option: `simple`
-	 * default: false
-	 * If true, only show the title, not the finished/attempts count. */
-	config_simple = json_is_true(json_object_get(config, "simple"));
-    
-	/* Configuration option: `source`
-	 * default: none
-	 * If provided, the corresponding :luavar will be tracked. Whenever this is
-	 * is a string of non-zero length, it will be displayed in place of the
-	 * title. */
-	config_source = json_string_value(json_object_get(config, "source"));
-	if (config_source != NULL) {
+     * default: false
+     * If true, only show the title, not the finished/attempts count. */
+    config_simple = json_is_true(json_object_get(config, "simple"));
+
+    /* Configuration option: `source`
+     * default: none
+     * If provided, the corresponding :luavar will be tracked. Whenever this is
+     * is a string of non-zero length, it will be displayed in place of the
+     * title. */
+    config_source = json_string_value(json_object_get(config, "source"));
+    if (config_source != NULL) {
         self->title_content = lasr_global_create(config_source);
         register_shared_global(self->title_content);
-	}
+    }
 
     self->header = gtk_center_box_new();
     gtk_center_box_set_shrink_center_last(GTK_CENTER_BOX(self->header), FALSE);
@@ -141,7 +141,7 @@ static void title_draw(LSComponent* self_, const ls_game* game, const ls_timer* 
             game->attempt_count);
         gtk_label_set_text(GTK_LABEL(self->attempts), buf);
     }
-    
+
     title_type = import_shared_global(self->title_content, &title_export);
     if (title_type == LASR_TYPE_DYNAMIC) {
         gtk_label_set_text(GTK_LABEL(self->title), title_export.dynamic->bytes);
