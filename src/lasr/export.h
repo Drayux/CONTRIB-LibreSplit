@@ -79,7 +79,7 @@ typedef struct {
     atomic_int type; /*!< data type (LASR_TYPE_XXX) */
     union {
         atomic_ullong atomic; /*!< accessor for fixed-length data */
-        lasr_dynamic_data const* const dynamic; /*!< accessor for variable-length data */
+        const lasr_dynamic_data* const dynamic; /*!< accessor for variable-length data */
     };
 } lasr_value;
 
@@ -110,16 +110,16 @@ typedef struct {
  */
 typedef struct _lasr_global lasr_global;
 struct _lasr_global {
-    char const* key; /*!< name of tracked lua variable */
+    const char* key; /*!< name of tracked lua variable */
     lasr_global* next; /*!< next tracked value in sequence */
     atomic_int state; /*!< data exchange state */
     atomic_int held; /*!< true when struct is registered (tracked for safe cleanup) */
     lasr_value value; /*!< exported value */
 };
 
-lasr_global* lasr_global_create(char const* key);
-void export_atomic_global(lasr_global* container, double const value, int const type);
-void export_dynamic_global(lasr_global* container, char const* const value, size_t const len);
+lasr_global* lasr_global_create(const char* key);
+void export_atomic_global(lasr_global* container, const double value, const int type);
+void export_dynamic_global(lasr_global* container, const char* const value, const size_t len);
 int import_shared_global(lasr_global* container, lasr_export* target);
 
 size_t lasr_export_resize(lasr_export* value, size_t len);

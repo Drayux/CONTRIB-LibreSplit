@@ -243,7 +243,7 @@ static void pcall_fix_traceback(lua_State* L, const char* func)
 static void update_shared_globals(lua_State* L, lasr_global* head)
 {
     double number_value;
-    char const* str_value;
+    const char* str_value;
     size_t lstring_len;
     int container_state;
     int container_held;

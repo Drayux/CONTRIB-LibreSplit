@@ -23,7 +23,7 @@
  * @return A pointer to the new instance. Returned value should be freed with
  * lasr_global_release()
  */
-lasr_global* lasr_global_create(char const* key)
+lasr_global* lasr_global_create(const char* key)
 {
     lasr_global* new;
     lasr_export value_;
@@ -69,7 +69,7 @@ lasr_global* lasr_global_create(char const* key)
  * @param type The lasr type of the new value to be written; must be an atomic
  * type (not DYNAMIC.)
  */
-void export_atomic_global(lasr_global* container, double const value, int const type)
+void export_atomic_global(lasr_global* container, const double value, const int type)
 {
     int container_state;
     int container_type;
@@ -167,7 +167,7 @@ void export_atomic_global(lasr_global* container, double const value, int const 
  *
  * @param len Number of bytes in the new value, excluding a NUL byte.
  */
-void export_dynamic_global(lasr_global* container, char const* const value, size_t const len)
+void export_dynamic_global(lasr_global* container, const char* const value, const size_t len)
 {
     size_t new_len = len;
     lasr_export* container_value = (lasr_export*)&container->value;
