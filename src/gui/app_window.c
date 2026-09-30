@@ -180,34 +180,27 @@ static void ls_app_window_destroy_components(LSAppWindow* win)
  */
 static void ls_app_window_default_components(LSAppWindow* win)
 {
-    LOG_DEBUG("Creating default components...");
-
-    // TODO: better defaults, just proof of concept right now
-    // ^^ Maybe better to make this static so we don't keep searching for it?
-    const LSComponentAvailable* default_components[] = {
-        get_component("title"),
-        get_component("splits"),
-        get_component("timer"),
-        /* --- */
-        NULL
-    };
-
-    const LSComponentAvailable** component_init;
+    const LSComponentAvailable* component_init;
     LSComponent* component;
     GtkWidget* widget;
 
-    component_init = &default_components[0];
+    LOG_DEBUG("Creating default components...");
 
-    while (*component_init) {
-        if ((component = (*component_init)->new(NULL))) {
-            widget = component->ops->widget(component);
-            if (widget) {
-                gtk_widget_set_margin_start(widget, WINDOW_PAD);
-                gtk_widget_set_margin_end(widget, WINDOW_PAD);
-                gtk_box_append(GTK_BOX(win->box),
-                    component->ops->widget(component));
+    component_init = &ls_components[0];
+
+    while (component_init->name) {
+        if (component_init->is_default) {
+            component = component_init->new(NULL);
+            if (component) {
+                widget = component->ops->widget(component);
+                if (widget) {
+                    gtk_widget_set_margin_start(widget, WINDOW_PAD);
+                    gtk_widget_set_margin_end(widget, WINDOW_PAD);
+                    gtk_box_append(GTK_BOX(win->box),
+                        component->ops->widget(component));
+                }
+                win->components = g_list_append(win->components, component);
             }
-            win->components = g_list_append(win->components, component);
         }
         ++component_init;
     }
@@ -229,8 +222,8 @@ static void ls_app_window_default_components(LSAppWindow* win)
  */
 static bool ls_app_window_add_components(LSAppWindow* win)
 {
-    json_t** component_config; /* List of pointers (json objects) */
-    json_t* component_ref;
+    json_t** component_json_ptr; /* List of pointers (json objects) */
+    json_t* component_config;
     const char* component_name;
     const LSComponentAvailable* component_init;
     LSComponent* component;
@@ -240,7 +233,7 @@ static bool ls_app_window_add_components(LSAppWindow* win)
     ls_app_window_destroy_components(win);
 
     if (win->game->component_config) {
-        component_config = &win->game->component_config[0];
+        component_json_ptr = &win->game->component_config[0];
     } else {
         /* No component config was given, use defaults! */
         ls_app_window_default_components(win);
@@ -249,8 +242,8 @@ static bool ls_app_window_add_components(LSAppWindow* win)
 
     LOG_DEBUG("Creating components from split file...");
 
-    while (*component_config) {
-        if (json_is_string(*component_config)) {
+    while (*component_json_ptr) {
+        if (json_is_string(*component_json_ptr)) {
             /* "components": [
              *     { ... }, // other component
              *
@@ -260,8 +253,8 @@ static bool ls_app_window_add_components(LSAppWindow* win)
              * ]
              *
              * ^^ Use default options for this component */
-            component_ref = NULL;
-            component_name = json_string_value(*component_config);
+            component_config = NULL;
+            component_name = json_string_value(*component_json_ptr);
         } else {
             /* "components": [
              *     { ... }, // other component
@@ -277,36 +270,26 @@ static bool ls_app_window_add_components(LSAppWindow* win)
              * ]
              *
              * ^^ Use user-configured options for this component */
-            component_ref = json_object_get(*component_config, "component");
-            component_name = json_string_value(component_ref);
+            component_config = *component_json_ptr;
+            component_name = json_string_value(json_object_get(component_config, "component"));
         }
 
         if (!component_name) {
             /* This case should not occur; developer error if it does */
             LOG_DEBUG("Unnamed component config");
             bad_config = true;
-            ++component_config;
+            ++component_json_ptr;
             continue;
         } else if (!(component_init = get_component(component_name))) {
             /* Occurs when the component name isn't matched.
              * I.E., user specifies `"components": [ "taimer" ]` */
             LOG_WARNF("Unrecognized component `%s`", component_name);
             bad_config = true;
-            ++component_config;
+            ++component_json_ptr;
             continue;
         }
 
-        if (component_ref) {
-            // TODO: I wrote this comment and even I don't know what it means
-            /* We don't use ref in the init call, but it's non-null if the
-             * configuration is a JSON object */
-            component = component_init->new(*component_config);
-        } else {
-            /* ^^ otherwise it was a string, so use default options (by setting
-             * the json object pointer to NULL.) */
-            component = component_init->new(NULL);
-        }
-
+        component = component_init->new(component_config);
         if (component) {
             widget = component->ops->widget(component);
             if (widget) {
@@ -321,7 +304,7 @@ static bool ls_app_window_add_components(LSAppWindow* win)
             bad_config = true;
         }
 
-        ++component_config; // Points to next component configuration (json object)
+        ++component_json_ptr; // Points to next component configuration (json object)
     }
 
     return bad_config;
@@ -374,37 +357,24 @@ void ls_app_window_open(LSAppWindow* win, const char* file)
         win->timer = 0;
     } else if (ls_runs_create(&win->runs)) {
         win->runs = 0;
-    } else if (ls_app_window_add_components(win)) {
-
-        /* TODO: Probably outside the scope of these changes, this popup could
-         * stand to be more helpful.
-         *
-         * Extra credit: maybe give options for "skip" or "use defaults."
-         * Though, this has further implications on what to save back to the
-         * splits file. */
-        ls_alert_error(GTK_WINDOW(win), "LibreSplit",
-            "A component has been skipped because it failed to load.\n"
-            "Check the spelling in the selected splits file:",
-            file);
-
-        /* Pending the above TODO, for now, this branch will always show the
-         * game, but with bad component configs skipped. */
-
-        // TODO: Duplicated code for the rebase
-        if (win->game->auto_splitter_file && win->game->auto_splitter_file[0] != '\0') {
-            LOG_DEBUG("Opening autosplitter");
-            struct stat st = { 0 };
-            if (stat(win->game->auto_splitter_file, &st) == -1) {
-                LOG_INFOF("Auto Splitter %s does not exist", win->game->auto_splitter_file);
-            } else {
-                strcpy(auto_splitter_file, win->game->auto_splitter_file);
-            }
-        }
-        atomic_store(&auto_splitter_enabled, cfg.libresplit.auto_splitter_enabled.value.b);
-        ls_app_window_show_game(win);
-        return; // success*!
     } else {
-        // TODO: Duplicated code for the rebase
+        if (ls_app_window_add_components(win)) {
+            /* TODO: Unsure if this is more helpful as log output or a popup.
+             * Too many popups is definitely annoying. Though, a popup could
+             * provide a "skip" or "use defaults" prompt, if beneficial.
+            ls_alert_error(GTK_WINDOW(win), "LibreSplit",
+                "A component has been skipped because it failed to load.\n"
+                "Check the spelling in the selected splits file:",
+                file);
+             */
+            LOG_WARNF(
+                "A component has been skipped because it failed to load. "
+                "Check the spelling in the selected splits file: %s",
+                file);
+
+            /* Not fatal, keep going */
+        }
+
         if (win->game->auto_splitter_file && win->game->auto_splitter_file[0] != '\0') {
             LOG_DEBUG("Opening autosplitter");
             struct stat st = { 0 };
@@ -805,10 +775,6 @@ gboolean ls_app_window_draw(gpointer data)
 
 static void ls_app_window_init(LSAppWindow* win)
 {
-    const char* theme;
-    const char* theme_variant;
-    int i;
-
     LOG_DEBUG("Initializing LibreSplit Window");
 
     win->display = gdk_display_get_default();

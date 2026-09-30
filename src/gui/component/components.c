@@ -4,10 +4,12 @@
  */
 #include "components.h"
 
+#define OPTIONAL 0
+#define DEFAULT 1
+
 LSComponent* ls_component_best_sum_new(json_t* config);
 LSComponent* ls_component_timer_new(json_t* config);
 LSComponent* ls_component_detailed_timer_new(json_t* config);
-LSComponent* ls_component_lua_title_new(json_t* config);
 LSComponent* ls_component_pb_new(json_t* config);
 LSComponent* ls_component_prev_segment_new(json_t* config);
 LSComponent* ls_component_splits_new(json_t* config);
@@ -15,20 +17,16 @@ LSComponent* ls_component_title_new(json_t* config);
 LSComponent* ls_component_wr_new(json_t* config);
 
 const LSComponentAvailable ls_components[] = {
-    { "title", ls_component_title_new },
+    { "title", ls_component_title_new, DEFAULT },
+    { "splits", ls_component_splits_new, DEFAULT },
+    { "detailed-timer", ls_component_detailed_timer_new, DEFAULT },
+    { "prev-segment", ls_component_prev_segment_new, DEFAULT },
+    { "best-sum", ls_component_best_sum_new, DEFAULT },
+    { "pb", ls_component_pb_new, DEFAULT },
+    { "wr", ls_component_wr_new, DEFAULT },
 
-    // Temporary proof-of-concept component! Future PRs will make this obsolete
-    // with configuration options. But since we're on our own branch, it's
-    // easier to leave this in place :)
-    { "lua_title", ls_component_lua_title_new },
+    { "timer", ls_component_timer_new, OPTIONAL },
 
-    { "splits", ls_component_splits_new },
-    { "timer", ls_component_timer_new },
-    { "detailed-timer", ls_component_detailed_timer_new },
-    { "prev-segment", ls_component_prev_segment_new },
-    { "best-sum", ls_component_best_sum_new },
-    { "pb", ls_component_pb_new },
-    { "wr", ls_component_wr_new },
     { NULL, NULL }
 };
 

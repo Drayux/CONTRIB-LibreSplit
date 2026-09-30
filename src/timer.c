@@ -621,7 +621,11 @@ int ls_game_create(ls_game** game_ptr, const char* path, char** error_msg)
             goto game_create_error;
         }
     }
-    // set title TODO: remove this when title becomes editable via layouts
+
+    // Revised TODO for component-config: Add a category option to the title
+    // ^^ Not sure how to integrate this with source...maybe title source and category source?
+    // ^^ Maybe show_subtitle?
+    // Atode, remove the entire title value from the game struct, let the component construct it
     if (game->name) {
         // length for new string including null byte
         size_t len = strlen(game->name) + 1;
@@ -646,6 +650,8 @@ int ls_game_create(ls_game** game_ptr, const char* path, char** error_msg)
             strcpy(game->title + (len - cat_len - 1), game->category);
         }
     }
+    /* *** */
+
     // copy theme
     ref = json_object_get(json, "theme");
     if (ref) {

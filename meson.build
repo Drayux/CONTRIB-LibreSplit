@@ -47,7 +47,6 @@ libresplit_sources = files(
     'src/gui/component/prev-segment.c',
     'src/gui/component/splits.c',
     'src/gui/component/title.c',
-    'src/gui/component/lua_title.c',
     'src/gui/component/wr.c',
     'src/gui/context_menu.c',
     'src/gui/dialogs.c',

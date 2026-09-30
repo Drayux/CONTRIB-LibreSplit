@@ -35,8 +35,9 @@ typedef struct LSComponentOps {
 } LSComponentOps;
 
 typedef struct LSComponentAvailable {
-    char* name;
-    LSComponent* (*new)(json_t* config);
+    char* name; /*!< Unique name of the component */
+    LSComponent* (*new)(json_t* config); /*!< New instance function pointer */
+    bool is_default; /*|< Should this component be created by default */
 } LSComponentAvailable;
 
 // A NULL-terminated array of all available components
