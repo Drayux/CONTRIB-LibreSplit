@@ -20,6 +20,13 @@
 	font-size: 11pt;
 }
 
+.category {
+	color: #94EAEA;
+	padding-top: 0px;
+	padding-bottom: 4px;
+	font-size: 9pt;
+}
+
 .attempt-count {
 	color: #2196F3;
 	font-size: 9pt;

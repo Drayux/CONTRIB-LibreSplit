@@ -359,16 +359,22 @@ void ls_app_window_open(LSAppWindow* win, const char* file)
         win->runs = 0;
     } else {
         if (ls_app_window_add_components(win)) {
-            /* TODO: Unsure if this is more helpful as log output or a popup.
+
+            /* TODO FOR PR DISCUSSION: Unsure if this is more helpful as log
+                         * output or a popup.
+                         *
              * Too many popups is definitely annoying. Though, a popup could
              * provide a "skip" or "use defaults" prompt, if beneficial.
+                         *
             ls_alert_error(GTK_WINDOW(win), "LibreSplit",
-                "A component has been skipped because it failed to load.\n"
+                "A component has been skipped because it could not be loaded.\n"
                 "Check the spelling in the selected splits file:",
                 file);
+                         *
              */
+
             LOG_WARNF(
-                "A component has been skipped because it failed to load. "
+                "A component has been skipped because it could not be loaded. "
                 "Check the spelling in the selected splits file: %s",
                 file);
 

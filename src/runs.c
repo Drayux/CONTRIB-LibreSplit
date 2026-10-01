@@ -548,7 +548,7 @@ static json_t* get_or_create_runs_history(const ls_game* game, const char* date,
     }
 
     len = (size_t)written;
-    if (!create_default_directory(game->title ? game->title : "runs history directory", path, 0755, win)) {
+    if (!create_default_directory(game->hist_dir ? game->hist_dir : "runs history directory", path, 0755, win)) {
         return NULL;
     }
 

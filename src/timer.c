@@ -390,8 +390,8 @@ void ls_game_release(ls_game* game)
     }
 
     LOG_DEBUG("Releasing game...");
-    free(game->title);
-    game->title = 0;
+    free(game->hist_dir);
+    game->hist_dir = 0;
 
     free(game->name);
     game->name = 0;
@@ -622,10 +622,7 @@ int ls_game_create(ls_game** game_ptr, const char* path, char** error_msg)
         }
     }
 
-    // Revised TODO for component-config: Add a category option to the title
-    // ^^ Not sure how to integrate this with source...maybe title source and category source?
-    // ^^ Maybe show_subtitle?
-    // Atode, remove the entire title value from the game struct, let the component construct it
+    // create a unique title for run history directory
     if (game->name) {
         // length for new string including null byte
         size_t len = strlen(game->name) + 1;
@@ -637,20 +634,19 @@ int ls_game_create(ls_game** game_ptr, const char* path, char** error_msg)
             len += cat_len + 1;
         }
 
-        game->title = calloc(len, sizeof(char));
-        if (!game->title) {
+        game->hist_dir = calloc(len, sizeof(char));
+        if (!game->hist_dir) {
             error = 1;
             goto game_create_error;
         }
 
-        strcpy(game->title, game->name);
+        strcpy(game->hist_dir, game->name);
         if (game->category) {
             // len contains the full string length, subtract the category, the null byte and the space.
-            strcpy(game->title + (len - cat_len - 2), " ");
-            strcpy(game->title + (len - cat_len - 1), game->category);
+            strcpy(game->hist_dir + (len - cat_len - 2), " ");
+            strcpy(game->hist_dir + (len - cat_len - 1), game->category);
         }
     }
-    /* *** */
 
     // copy theme
     ref = json_object_get(json, "theme");
@@ -1192,9 +1188,17 @@ int ls_game_save(const ls_game* game)
     json_t* json = json_object();
     json_t* splits = json_array();
     json_t** component_config;
-    if (game->title) {
-        json_object_set_new(json, "title", json_string(game->title));
-    }
+
+    /* TODO FOR PR DISCUSSION: This was originaly game->title.
+     * The snapshot did not copy that value, thus this would have always been NULL.
+     * Was that intentionally omitted?
+     *
+if (game->hist_dir) {
+    json_object_set_new(json, "hist_dir", json_string(game->hist_dir));
+}
+     *
+     */
+
     if (game->name) {
         json_object_set_new(json, "name", json_string(game->name));
     }

@@ -94,20 +94,15 @@ static ls_game* create_snapshot(const ls_game* game)
         }
     }
 
-    /* TODO / NOTE: These structs are shallow copied!
+    /* TODO FOR PR DISCUSSION: These JSON configs are shallow copied!
      *
-     * This mostly temporary so that my new config saves back to the splits
-     * file while I'm implementing it. Assumed safe because this data JSON is
-     * assumed constant.
+     * I do not yet know if there is an intended use beyond an async save thread.
+     * I implemented this as such assuming that there was not. As this data
+     * JSON is asserted constant, this is the more efficient approach.
      *
-     * Big picture, the best solution I believe would be to revise the
-     * structures that compose our timer/game/settings/etc.
-     *
-     * Static info per game instance (like the configs, run name, etc.) could
-     * be saved in one place, and then an array of splits "a run" could be its
-     * own, both referenced by the "aggregate game type." More on this
-     * elsewhere, but TLDR make a "sharable file" and then a "user settings
-     * file" and finally a "user run data file / folder"
+     * Ultimately, I think a revision of the user files to better seperate
+     * game configuration and run data is the correct direction, but that is
+     * best suited for its own PR.
      */
     if (game->component_config && (game->component_config_count > 0)) {
         snapshot->component_config = calloc(game->component_config_count + 1, sizeof(json_t*));
