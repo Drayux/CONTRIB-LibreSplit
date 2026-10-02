@@ -8,25 +8,21 @@
 #define DEFAULT 1
 
 LSComponent* ls_component_best_sum_new(json_t* config);
-LSComponent* ls_component_timer_new(json_t* config);
-LSComponent* ls_component_detailed_timer_new(json_t* config);
 LSComponent* ls_component_pb_new(json_t* config);
 LSComponent* ls_component_prev_segment_new(json_t* config);
 LSComponent* ls_component_splits_new(json_t* config);
+LSComponent* ls_component_detailed_timer_new(json_t* config);
 LSComponent* ls_component_title_new(json_t* config);
 LSComponent* ls_component_wr_new(json_t* config);
 
 const LSComponentAvailable ls_components[] = {
     { "title", ls_component_title_new, DEFAULT },
     { "splits", ls_component_splits_new, DEFAULT },
-    { "detailed-timer", ls_component_detailed_timer_new, DEFAULT },
+    { "timer", ls_component_detailed_timer_new, DEFAULT },
     { "prev-segment", ls_component_prev_segment_new, DEFAULT },
     { "best-sum", ls_component_best_sum_new, DEFAULT },
     { "pb", ls_component_pb_new, DEFAULT },
     { "wr", ls_component_wr_new, DEFAULT },
-
-    { "timer", ls_component_timer_new, OPTIONAL },
-
     { NULL, NULL }
 };
 

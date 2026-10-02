@@ -40,7 +40,6 @@ libresplit_sources = files(
 
     # Components
     'src/gui/component/best-sum.c',
-    'src/gui/component/clock.c',
     'src/gui/component/components.c',
     'src/gui/component/detailed-timer.c',
     'src/gui/component/pb.c',

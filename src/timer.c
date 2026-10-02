@@ -256,7 +256,9 @@ void ls_time_clear(ls_time* time)
  * like strcpy would do.
  *
  * @param string The destination where to copy the formatted string to.
+ *        Maximum possible length of output: 18 bytes (incl. NUL)
  * @param millis The destination where to copy the subseconds part string to.
+ *        Maximum possible length of output: 7 bytes (incl. NUL)
  * @param time The time to convert
  * @param serialized Show all 6 decimal places, if set to zero will only show 2
  * @param delta Show the time as a delta, when negative
@@ -338,7 +340,7 @@ void ls_time_string(char* string, long long time)
 
 void ls_time_millis_string(char* seconds, char* millis, long long time)
 {
-    ls_time_string_format(seconds, millis, time, 0, 0, 0);
+    ls_time_string_format(seconds, millis, time, 1, 0, 0);
 }
 
 void ls_split_string(char* string, long long time, int compact)
