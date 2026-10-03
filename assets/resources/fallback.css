@@ -13,6 +13,10 @@
 	border-bottom: 1px solid rgba(255, 255, 255, 0.07);
 }
 
+.game-icon {
+	margin: 4px 4px 4px 8px;
+}
+
 .title {
 	padding-top: 4px;
 	padding-bottom: 4px;

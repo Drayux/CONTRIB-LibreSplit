@@ -392,8 +392,8 @@ void ls_game_release(ls_game* game)
     }
 
     LOG_DEBUG("Releasing game...");
-    free(game->hist_dir);
-    game->hist_dir = 0;
+    free(game->runs_dir);
+    game->runs_dir = 0;
 
     free(game->name);
     game->name = 0;
@@ -594,9 +594,15 @@ int ls_game_create(ls_game** game_ptr, const char* path, char** error_msg)
             error = 1;
             goto game_create_error;
         }
-    } else {
+    }
+
+    /* TODO PR DISCUSSION:
+     * Same concern as the ls_game_save routine. If this value is never saved,
+     * then it will never reappear in the save file, so this will also be null
+     * all except when loading a file for the first time
+    else {
         // check if title exists
-        ref = json_object_get(json, "title");
+        ref = json_object_get(json, "runs_dir");
         if (ref) {
             game->name = strdup(json_string_value(ref));
             if (!game->name) {
@@ -605,6 +611,8 @@ int ls_game_create(ls_game** game_ptr, const char* path, char** error_msg)
             }
         }
     }
+     * *** */
+
     // copy game category
     ref = json_object_get(json, "category");
     if (ref) {
@@ -636,17 +644,17 @@ int ls_game_create(ls_game** game_ptr, const char* path, char** error_msg)
             len += cat_len + 1;
         }
 
-        game->hist_dir = calloc(len, sizeof(char));
-        if (!game->hist_dir) {
+        game->runs_dir = calloc(len, sizeof(char));
+        if (!game->runs_dir) {
             error = 1;
             goto game_create_error;
         }
 
-        strcpy(game->hist_dir, game->name);
+        strcpy(game->runs_dir, game->name);
         if (game->category) {
             // len contains the full string length, subtract the category, the null byte and the space.
-            strcpy(game->hist_dir + (len - cat_len - 2), " ");
-            strcpy(game->hist_dir + (len - cat_len - 1), game->category);
+            strcpy(game->runs_dir + (len - cat_len - 2), " ");
+            strcpy(game->runs_dir + (len - cat_len - 1), game->category);
         }
     }
 
@@ -1195,9 +1203,9 @@ int ls_game_save(const ls_game* game)
      * The snapshot did not copy that value, thus this would have always been NULL.
      * Was that intentionally omitted?
      *
-if (game->hist_dir) {
-    json_object_set_new(json, "hist_dir", json_string(game->hist_dir));
-}
+    if (game->runs_dir) {
+        json_object_set_new(json, "runs_dir", json_string(game->runs_dir));
+    }
      *
      */
 

@@ -44,5 +44,6 @@ typedef struct LSComponentAvailable {
 extern const LSComponentAvailable ls_components[];
 
 const LSComponentAvailable* get_component(const char* const name);
+GString* uri_from_path(const ls_game* game, const char* source_path);
 
 #endif /* __COMPONENTS_H__ */

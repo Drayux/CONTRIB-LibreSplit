@@ -29,6 +29,8 @@ typedef struct LSSplits {
     GtkWidget** split_times;
     GtkCssProvider* icons_css_provider;
     gulong scroll_changed_handler;
+    bool opt_reverse_order;
+    bool opt_pin_final;
 } LSSplits;
 extern LSComponentOps ls_splits_operations;
 
@@ -51,104 +53,29 @@ void free_all(LSSplits* self_)
 }
 
 /**
- * @brief Resolves the icon file path to a URI.
- * This handles converting full/relative file paths to the user's system
- * so that it can be converted to a usable file:// URI
- * while retaining already valid URI's for web urls, data-urls etc.
- *
- * If you use this, you must g_free the result if it is not NULL after usage.
- *
- * @param game The game struct for the current splits file.
- * @param source The path to the icon being loaded.
- * @return char* A new string to for the valid icon URI.
- */
-static char* split_icon_uri(const ls_game* game, const char* source)
-{
-    // max_len should be -1 for null terminated strings.
-    if (!source || !g_utf8_validate(source, -1, NULL)) {
-        return NULL;
-    }
-
-    // The supplied source is already correctly formatted.
-    // Duplicate it so the followup free doesn't kill the source path.
-    if (g_uri_peek_scheme(source)) {
-        return g_strdup(source);
-    }
-
-    GFile* icon;
-    if (g_path_is_absolute(source)) {
-        icon = g_file_new_for_path(source);
-    } else {
-        GFile* splits_file = g_file_new_for_path(game->path);
-        GFile* parent_dir = g_file_get_parent(splits_file);
-        g_object_unref(splits_file);
-
-        if (!parent_dir) {
-            return NULL;
-        }
-
-        icon = g_file_resolve_relative_path(parent_dir, source);
-        g_object_unref(parent_dir);
-    }
-
-    char* uri = g_file_get_uri(icon);
-    g_object_unref(icon);
-    return uri;
-}
-
-/**
- * @brief Appends a URI to a GString. Wraps the string in quotes and then escapes
- * special characters to w3 spec so that non-basic URIs don't break.
- * This also applies quotes so that you can pass something like
- * https://url.com
- * and get
- * "https://url.com"
- * As your response to pass directly to a css URL such as
- * background-image: url(YOUR-STRING);
- *
- * @param str The string to append the URI to.
- * @param value A raw URI path string.
- */
-static void append_quoted_uri(GString* str, const char* value)
-{
-    g_string_append_c(str, '"');
-
-    // https://www.w3.org/TR/cssom-1/#serialize-a-string
-    for (const unsigned char* c = (const unsigned char*)value; *c != '\0'; ++c) {
-        switch (*c) {
-            /** U+0022 = " */
-            case '"':
-                g_string_append(str, "\\\"");
-                break;
-            /** U+005C = \ */
-            case '\\':
-                g_string_append(str, "\\\\");
-                break;
-            /** NULL character means the end of string so we don't need to handle that */
-            default:
-                if ((*c >= 1 && *c <= 0x1F) || *c == 0x7F) {
-                    g_string_append_printf(str, "\\%x ", *c);
-                } else {
-                    g_string_append_c(str, *c);
-                }
-        }
-    }
-
-    g_string_append_c(str, '"');
-}
-
-/**
  * Constructor
  */
 LSComponent* ls_component_splits_new(json_t* config)
 {
     LSSplits* self;
+
     self = calloc(1, sizeof(LSSplits));
     if (!self) {
         return NULL;
     }
-
     self->base.ops = &ls_splits_operations;
+
+    /* Configuration option: `reverse`
+     * default: false
+     * If true, splits are ordered with the last split at the top. */
+    self->opt_reverse_order = json_is_true(json_object_get(config, "reverse"));
+
+    /* Configuration option: `pin-final`
+     * default: true
+     * If true, the last split will always be visible. */
+    self->opt_pin_final = !json_is_false(json_object_get(config, "pin-final"));
+
+    /* --- End of configuration options --- */
 
     self->split_adjust = gtk_adjustment_new(0., 0., 0., 0., 0., 0.);
 
@@ -209,7 +136,7 @@ static GtkWidget* splits_widget(LSComponent* self)
     return ((LSSplits*)self)->container;
 }
 
-static void scroll_to_bottom(GtkAdjustment* adjustment, gpointer data)
+static void scroll_to_last(GtkAdjustment* adjustment, gpointer data)
 {
     LSSplits* self = data;
     double lower = gtk_adjustment_get_lower(adjustment);
@@ -247,7 +174,7 @@ static void splits_trailer(LSComponent* self_)
             self->scroll_changed_handler = g_signal_connect(
                 self->split_adjust,
                 "changed",
-                G_CALLBACK(scroll_to_bottom),
+                G_CALLBACK(scroll_to_last),
                 self);
             gtk_box_remove(GTK_BOX(self->split_last),
                 self->split_rows[last]);
@@ -311,8 +238,13 @@ static void splits_show_game(LSComponent* self_, const ls_game* game,
         self->split_rows[i] = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
         add_class(self->split_rows[i], "split");
         gtk_widget_set_hexpand(self->split_rows[i], TRUE);
-        gtk_box_append(GTK_BOX(self->splits),
-            self->split_rows[i]);
+
+        if (self->opt_reverse_order) {
+            gtk_box_append(GTK_BOX(self->splits), self->split_rows[i]);
+        } else {
+            printf("prepending %d\n", i);
+            gtk_box_prepend(GTK_BOX(self->splits), self->split_rows[i]);
+        }
 
         self->split_titles[i] = gtk_label_new(game->split_titles[i]);
         add_class(self->split_titles[i], "split-title");
@@ -333,17 +265,18 @@ static void splits_show_game(LSComponent* self_, const ls_game* game,
 
         if (game->contains_icons) {
             if (game->split_icon_paths[i] && split_title_class) {
-                char* icon = split_icon_uri(game, game->split_icon_paths[i]);
-                if (icon) {
-                    g_string_append_printf(icons_css_src, ".%s .split-icon { background-image: url(", split_title_class);
-                    append_quoted_uri(icons_css_src, icon);
-                    g_string_append(icons_css_src, "); }");
-                    g_free(icon);
+                GString* icon_uri = uri_from_path(game, game->split_icon_paths[i]);
+                if (icon_uri) {
+                    g_string_append_printf(icons_css_src,
+                        ".%s .split-icon { background-image: %s; }",
+                        split_title_class,
+                        icon_uri->str);
+                    g_string_free(icon_uri, TRUE);
                 }
             }
             self->split_icons[i] = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
             add_class(self->split_icons[i], "split-icon");
-            // set size but allow to dinamically change it from css with min-width and min-height
+            // set size but allow to dynamically change it from css with min-width and min-height
             gtk_widget_set_size_request(self->split_icons[i], 20, 20);
             gtk_box_append(GTK_BOX(self->split_rows[i]), self->split_icons[i]);
         }

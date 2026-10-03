@@ -16,6 +16,8 @@
 typedef struct LSTitle {
     LSComponent base; /*!< The base struct that is extended */
     GtkWidget* header; /*!< The container for the title component */
+    GtkWidget* icon; /*!< The widget containing the game icon image. */
+	GtkCssProvider* icon_css_provider; /*!< The CSS provider for the game icon image. */
     GtkWidget* title; /*!< The container for the composite title/subtitle */
     GtkWidget* game; /*!< The label containing the title itself */
     GtkWidget* category; /*!< The label containing the subtitle itself */
@@ -34,6 +36,7 @@ LSComponent* ls_component_title_new(json_t* config)
     GtkWidget* counts;
 
     struct {
+        bool show_icon;
         bool show_attempts;
         bool show_category;
         const char* title_source;
@@ -45,6 +48,11 @@ LSComponent* ls_component_title_new(json_t* config)
         return NULL;
     }
     self->base.ops = &ls_title_operations;
+
+    /* Configuration option: `show-icon`
+     * default: false
+     * If true, show the game icon on the left of the title box, if found. */
+    opt.show_icon = json_is_true(json_object_get(config, "show-icon"));
 
     /* Configuration option: `show-attempts`
      * default: true
@@ -73,9 +81,23 @@ LSComponent* ls_component_title_new(json_t* config)
     /* --- End of configuration options --- */
 
     self->header = gtk_center_box_new();
-    gtk_center_box_set_shrink_center_last(GTK_CENTER_BOX(self->header), FALSE);
     add_class(self->header, "header");
+    gtk_center_box_set_shrink_center_last(GTK_CENTER_BOX(self->header), FALSE);
 
+	if (opt.show_icon) {
+		self->icon = gtk_box_new(GTK_ORIENTATION_HORIZONTAL, 0);
+		add_class(self->icon, "game-icon");
+		gtk_widget_set_hexpand(self->icon, TRUE);
+		gtk_widget_set_vexpand(self->icon, TRUE);
+		gtk_center_box_set_start_widget(GTK_CENTER_BOX(self->header), self->icon);
+
+		self->icon_css_provider = gtk_css_provider_new();
+		gtk_style_context_add_provider_for_display(
+			gtk_widget_get_display(self->header),
+			GTK_STYLE_PROVIDER(self->icon_css_provider),
+			GTK_STYLE_PROVIDER_PRIORITY_USER);
+	}
+	
     self->title = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
     gtk_center_box_set_center_widget(GTK_CENTER_BOX(self->header), self->title);
 
@@ -167,7 +189,62 @@ static void title_show_game(LSComponent* self_, const ls_game* game,
             gtk_widget_set_visible(self->category, TRUE);
         }
     }
+
+	/* If specified, load the icon URI into the CSS */
+	if (self->icon_css_provider) {
+		GString* icon_css = g_string_new(NULL);
+		GString* icon_uri = uri_from_path(game, game->icon_path);
+		if (icon_css && icon_uri) {
+			g_string_printf(icon_css,
+				".game-icon {" \
+					"background-position: left;" \
+					"background-size: contain;" \
+					"background-repeat: no-repeat;" \
+					"margin: 4px 4px 4px 8px;" \
+					"background-image: %s;" \
+				"}", icon_uri->str);
+
+			gtk_css_provider_load_from_string(
+				self->icon_css_provider,
+				icon_css->str);
+		}
+		g_string_free(icon_css, TRUE);
+		g_string_free(icon_uri, TRUE);
+	}
 }
+
+/*
+static void title_clear_game(LSComponent* self_, const ls_game* game,
+    const ls_timer* timer)
+{
+    LSTitle* self = (LSTitle*)self_;
+
+    if (self->icons_css_provider) {
+        gtk_style_context_remove_provider_for_display(
+            gtk_widget_get_display(self->container),
+            GTK_STYLE_PROVIDER(self->icons_css_provider));
+        g_object_unref(self->icons_css_provider);
+        self->icons_css_provider = NULL;
+
+		// TODO: Not sure how to clean up yet!!
+		// Long story short, I want to reevaluate how the program handles the
+		// show_game / clear_game callbacks.
+		//
+		// I think close should delete entirely; open should delete if exists
+		// and regenerate and then show_game. But reload should call clear_game
+		// show_game only?
+		//
+		// But then what section is responsible for what roles? Clear game just
+		// to reset a component to an "empty" state perhaps?
+
+		// self->icon_css_provider = gtk_css_provider_new();
+		// gtk_style_context_add_provider_for_display(
+			// gtk_widget_get_display(self->header),
+			// GTK_STYLE_PROVIDER(self->icon_css_provider),
+			// GTK_STYLE_PROVIDER_PRIORITY_USER);
+    }
+}
+*/
 
 /**
  * Function to execute when ls_app_window_draw is executed.
@@ -217,5 +294,6 @@ LSComponentOps ls_title_operations = {
     .delete = title_delete,
     .widget = title_widget,
     .show_game = title_show_game,
+    // .clear_game = title_clear_game, // TODO maybe
     .draw = title_draw
 };
